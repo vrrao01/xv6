@@ -128,9 +128,11 @@ void panic(char *s)
 
 //PAGEBREAK: 50
 #define BACKSPACE 0x100
+#define LEFT_ARROW 228
+#define RIGHT_ARROW 229
 #define CRTPORT 0x3d4
 static ushort *crt = (ushort *)P2V(0xb8000); // CGA memory
-int max_pos = 0;
+int max_pos = 0;                             // Position of rightmost character
 static void
 cgaputc(int c)
 {
@@ -146,6 +148,10 @@ cgaputc(int c)
     pos += 80 - pos % 80;
   else if (c == BACKSPACE)
   {
+    /*
+    Ensure the cursor is not at the leftmost position and
+    appropriate shift the characters to the left. 
+    */
     if (pos > 0)
     {
       --pos;
@@ -155,16 +161,20 @@ cgaputc(int c)
       --max_pos;
     }
   }
-  else if (c == 228)
+  else if (c == LEFT_ARROW)
   {
-    --pos;
+    --pos; // Move cursor to the left
   }
-  else if (c == 229)
+  else if (c == RIGHT_ARROW)
   {
-    ++pos;
+    ++pos; // Move cursor to the right
   }
   else
   {
+    /* 
+    Print entered character onto the screen. 
+    Also, shift right in case entered character is in the middle.
+    */
     for (int t = max_pos; t >= pos; t--)
       crt[t + 1] = ((crt[t] & 0xff) | 0x0700);
     max_pos++;
@@ -187,7 +197,6 @@ cgaputc(int c)
   outb(CRTPORT + 1, pos >> 8);
   outb(CRTPORT, 15);
   outb(CRTPORT + 1, pos);
-  // crt[pos] = ' ' | 0x0700;
 }
 
 #define INPUT_BUF 128
@@ -197,7 +206,7 @@ struct
   uint r; // Read index
   uint w; // Write index
   uint e; // Edit index
-  uint m;
+  uint m; // Rightmost character index
 } input;
 
 void consputc(int c)
@@ -208,13 +217,13 @@ void consputc(int c)
     for (;;)
       ;
   }
-  if (c == 229)
+  if (c == RIGHT_ARROW)
   {
     uartputc(input.buf[input.e]);
     cgaputc(c);
     return;
   }
-  if (c == 228)
+  if (c == LEFT_ARROW)
   {
     uartputc('\b');
     cgaputc(c);
@@ -223,6 +232,9 @@ void consputc(int c)
   if (c == BACKSPACE)
   {
     uartputc('\b');
+    /*
+    
+    */
     for (uint t = input.e; t < input.m; t++)
     {
       uartputc(input.buf[t + 1]);
@@ -274,14 +286,14 @@ void consoleintr(int (*getc)(void))
         consputc(BACKSPACE);
       }
       break;
-    case 228:
+    case LEFT_ARROW:
       if (input.e != input.w)
       {
         input.e--;
         consputc(c);
       }
       break;
-    case 229:
+    case RIGHT_ARROW:
       if (input.e != input.m)
       {
         consputc(c);
@@ -294,10 +306,13 @@ void consoleintr(int (*getc)(void))
         c = (c == '\r') ? '\n' : c;
         if (c == '\n' || c == C('D') || input.e == input.r + INPUT_BUF)
         {
-          input.e = input.m;
+          input.e = input.m; // Move edit index to rightmost index to execute command
         }
         if (input.e < input.m)
         {
+          /*
+          Shift right input buffer  in case character is not added at rightmost position.
+          */
           int n = input.m - input.e;
           for (int i = n; i > 0; i--)
           {
