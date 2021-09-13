@@ -26,6 +26,18 @@ sys_wait(void)
   return wait();
 }
 
+int 
+sys_wait2(void)
+{
+  int *stime;
+  int *retime;
+  int *rutime;
+  if(argptr(0, (void*)&retime, sizeof(retime))<0) return-1;
+  if(argptr(1, (void*)&rutime, sizeof(rutime))<0) return-1;
+  if(argptr(2, (void*)&stime, sizeof(stime))<0) return -1;
+  return wait2(retime,rutime,stime);
+}
+
 int
 sys_kill(void)
 {
