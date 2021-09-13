@@ -124,7 +124,6 @@ void panic(char *s)
   panicked = 1; // freeze other CPU
   for (;;)
     ;
-}
 
 //PAGEBREAK: 50
 #define BACKSPACE 0x100
@@ -163,6 +162,7 @@ cgaputc(int c)
       --max_pos;
     }
   }
+
   else if (c == LEFT_ARROW)
   {
     --pos; // Move cursor to the left
@@ -199,6 +199,7 @@ cgaputc(int c)
   outb(CRTPORT + 1, pos >> 8);
   outb(CRTPORT, 15);
   outb(CRTPORT + 1, pos);
+
 }
 
 #define INPUT_BUF 128
@@ -229,12 +230,14 @@ void consputc(int c)
     for (;;)
       ;
   }
+
   if (c == RIGHT_ARROW)
   {
     uartputc(input.buf[input.e]);
     cgaputc(c);
     return;
   }
+
   if (c == LEFT_ARROW)
   {
     uartputc('\b');
@@ -266,6 +269,7 @@ void consputc(int c)
     uartputc(c);
   cgaputc(c);
 }
+
 
 void clearConsoleLine()
 {
@@ -394,6 +398,7 @@ void consoleintr(int (*getc)(void))
         consputc(c);
       }
       break;
+
     case RIGHT_ARROW:
       if (input.e != input.m)
       {
@@ -401,6 +406,7 @@ void consoleintr(int (*getc)(void))
         input.e++;
       }
       break;
+
     case UP_ARROW:
       if (historyRing.buffer[historyRing.head][0] != 0)
       {

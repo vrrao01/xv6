@@ -182,6 +182,7 @@ UPROGS=\
 	_wc\
 	_zombie\
 	_history\
+	_wait2\
 
 fs.img: mkfs README $(UPROGS)
 	./mkfs fs.img README $(UPROGS)
