@@ -219,7 +219,7 @@ struct
   int tail;
   int currentIndex;
   char partialBuffer[INPUT_BUF];
-} history;
+} historyRing;
 
 void consputc(int c)
 {
@@ -289,9 +289,9 @@ void copyHistorytoInputBuffer()
 {
   for (int i = 0; i < INPUT_BUF; i++)
   {
-    if (history.buffer[history.currentIndex][i] == 0)
+    if (historyRing.buffer[historyRing.currentIndex][i] == 0)
       break;
-    input.buf[(input.r + i) % INPUT_BUF] = history.buffer[history.currentIndex][i];
+    input.buf[(input.r + i) % INPUT_BUF] = historyRing.buffer[historyRing.currentIndex][i];
     input.e++;
     input.m++;
   }
@@ -299,10 +299,10 @@ void copyHistorytoInputBuffer()
 
 void savePartialCommand()
 {
-  memset(history.partialBuffer, 0, INPUT_BUF);
+  memset(historyRing.partialBuffer, 0, INPUT_BUF);
   for (int i = input.r; i < input.m; i++)
   {
-    history.partialBuffer[i - input.r] = input.buf[i % INPUT_BUF];
+    historyRing.partialBuffer[i - input.r] = input.buf[i % INPUT_BUF];
   }
 }
 
@@ -310,9 +310,9 @@ void copyPartialToInputBuffer()
 {
   for (int i = 0; i < INPUT_BUF; i++)
   {
-    if (history.partialBuffer[i] == 0)
+    if (historyRing.partialBuffer[i] == 0)
       break;
-    input.buf[(input.r + i) % INPUT_BUF] = history.partialBuffer[i];
+    input.buf[(input.r + i) % INPUT_BUF] = historyRing.partialBuffer[i];
     input.e++;
     input.m++;
   }
@@ -320,27 +320,38 @@ void copyPartialToInputBuffer()
 
 void saveHistory()
 {
-  if (history.buffer[history.head][0] == 0)
+  if (historyRing.buffer[historyRing.head][0] == 0)
   {
     int length = input.m - input.r;
     for (int i = 0; i < length; i++)
     {
-      history.buffer[history.tail][i] = input.buf[(input.r + i) % INPUT_BUF];
+      historyRing.buffer[historyRing.tail][i] = input.buf[(input.r + i) % INPUT_BUF];
     }
   }
   else
   {
-    history.tail = (history.tail + 1) % MAX_HISTORY;
-    if (history.tail == history.head)
-      history.head = (history.head + 1) % MAX_HISTORY;
+    historyRing.tail = (historyRing.tail + 1) % MAX_HISTORY;
+    if (historyRing.tail == historyRing.head)
+      historyRing.head = (historyRing.head + 1) % MAX_HISTORY;
     int length = input.m - input.r;
-    memset(history.buffer[history.tail], 0, INPUT_BUF);
+    memset(historyRing.buffer[historyRing.tail], 0, INPUT_BUF);
     for (int i = 0; i < length; i++)
     {
-      history.buffer[history.tail][i] = input.buf[(input.r + i) % INPUT_BUF];
+      historyRing.buffer[historyRing.tail][i] = input.buf[(input.r + i) % INPUT_BUF];
     }
   }
-  history.currentIndex = -1;
+  historyRing.currentIndex = -1;
+}
+
+int history(char *buffer, int historyID)
+{
+  if (historyID < 0 || historyID > 15)
+    return 2;
+  int index = (historyRing.head + historyID) % MAX_HISTORY;
+  if (historyRing.buffer[index][0] == 0)
+    return 1;
+  memmove(buffer, historyRing.buffer[index], INPUT_BUF);
+  return 0;
 }
 #define C(x) ((x) - '@') // Control-x
 
@@ -391,44 +402,44 @@ void consoleintr(int (*getc)(void))
       }
       break;
     case UP_ARROW:
-      if (history.buffer[history.head][0] != 0)
+      if (historyRing.buffer[historyRing.head][0] != 0)
       {
         clearConsoleLine();
-        if (history.currentIndex == -1)
+        if (historyRing.currentIndex == -1)
         {
-          history.currentIndex = history.tail;
+          historyRing.currentIndex = historyRing.tail;
           savePartialCommand();
         }
-        else if (history.currentIndex != history.head)
-          history.currentIndex = (history.currentIndex + MAX_HISTORY - 1) % MAX_HISTORY;
+        else if (historyRing.currentIndex != historyRing.head)
+          historyRing.currentIndex = (historyRing.currentIndex + MAX_HISTORY - 1) % MAX_HISTORY;
         clearInputBufferLine();
         release(&cons.lock);
-        cprintf(history.buffer[history.currentIndex]);
+        cprintf(historyRing.buffer[historyRing.currentIndex]);
         acquire(&cons.lock);
         copyHistorytoInputBuffer();
       }
       break;
     case DOWN_ARROW:
-      if (history.buffer[history.head][0] != 0)
+      if (historyRing.buffer[historyRing.head][0] != 0)
       {
-        if (history.currentIndex == history.tail)
+        if (historyRing.currentIndex == historyRing.tail)
         {
-          history.currentIndex = -1;
+          historyRing.currentIndex = -1;
           clearConsoleLine();
           clearInputBufferLine();
           release(&cons.lock);
-          cprintf(history.partialBuffer);
+          cprintf(historyRing.partialBuffer);
           acquire(&cons.lock);
           copyPartialToInputBuffer();
         }
-        else if (history.currentIndex != -1)
+        else if (historyRing.currentIndex != -1)
         {
-          history.currentIndex = (history.currentIndex + 1) % MAX_HISTORY;
+          historyRing.currentIndex = (historyRing.currentIndex + 1) % MAX_HISTORY;
           clearConsoleLine();
           clearInputBufferLine();
           copyHistorytoInputBuffer();
           release(&cons.lock);
-          cprintf(history.buffer[history.currentIndex]);
+          cprintf(historyRing.buffer[historyRing.currentIndex]);
           acquire(&cons.lock);
         }
       }
