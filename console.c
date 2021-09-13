@@ -213,13 +213,16 @@ struct
   uint m; // Rightmost character index
 } input;
 
+/*
+Shell history ring structure
+*/
 struct
 {
-  char buffer[MAX_HISTORY][INPUT_BUF];
-  int head;
-  int tail;
-  int currentIndex;
-  char partialBuffer[INPUT_BUF];
+  char buffer[MAX_HISTORY][INPUT_BUF]; // 2D array to store commands
+  int head;                            // Head of the queue
+  int tail;                            // Tail of the queue
+  int currentIndex;                    // Index of current command from history being viewed
+  char partialBuffer[INPUT_BUF];       // Buffer to store command typed before accessing history
 } historyRing;
 
 void consputc(int c)
@@ -270,24 +273,33 @@ void consputc(int c)
   cgaputc(c);
 }
 
+/*
+Removes the line of text currently display on the console.
+*/
 void clearConsoleLine()
 {
   for (int i = input.e; i < input.m; i++)
   {
-    consputc(RIGHT_ARROW);
+    consputc(RIGHT_ARROW); // Moves cursor to rightmost position
   }
   for (int i = input.r; i < input.m; i++)
   {
-    consputc(BACKSPACE);
+    consputc(BACKSPACE); // Clears text by repeated BACKSPACEs
   }
 }
 
+/*
+Resets input buffer in order to fill command from history 
+*/
 void clearInputBufferLine()
 {
   input.m = input.r;
   input.e = input.r;
 }
 
+/*
+Copy command at index history.currentIndex into the input buffer
+*/
 void copyHistorytoInputBuffer()
 {
   for (int i = 0; i < INPUT_BUF; i++)
@@ -300,6 +312,9 @@ void copyHistorytoInputBuffer()
   }
 }
 
+/*
+Copies the command entered before pressing on up arrow into a temporary buffer
+*/
 void savePartialCommand()
 {
   memset(historyRing.partialBuffer, 0, INPUT_BUF);
@@ -309,6 +324,9 @@ void savePartialCommand()
   }
 }
 
+/*
+Copies the command typed before accessing history back into input buffer
+*/
 void copyPartialToInputBuffer()
 {
   for (int i = 0; i < INPUT_BUF; i++)
@@ -321,6 +339,9 @@ void copyPartialToInputBuffer()
   }
 }
 
+/*
+Stores the entered command into the history shell ring.
+*/
 void saveHistory()
 {
   if (historyRing.buffer[historyRing.head][0] == 0)
@@ -346,6 +367,9 @@ void saveHistory()
   historyRing.currentIndex = -1;
 }
 
+/*
+Function used by sys_history system call to copy command at index = historyID into buffer
+*/
 int history(char *buffer, int historyID)
 {
   if (historyID < 0 || historyID > 15)
@@ -418,7 +442,7 @@ void consoleintr(int (*getc)(void))
         else if (historyRing.currentIndex != historyRing.head)
           historyRing.currentIndex = (historyRing.currentIndex + MAX_HISTORY - 1) % MAX_HISTORY;
         clearInputBufferLine();
-        release(&cons.lock);
+        release(&cons.lock); // Release console lock so that cprint can aquire lock
         cprintf(historyRing.buffer[historyRing.currentIndex]);
         acquire(&cons.lock);
         copyHistorytoInputBuffer();
