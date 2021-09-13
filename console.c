@@ -124,6 +124,7 @@ void panic(char *s)
   panicked = 1; // freeze other CPU
   for (;;)
     ;
+}
 
 //PAGEBREAK: 50
 #define BACKSPACE 0x100
@@ -199,7 +200,6 @@ cgaputc(int c)
   outb(CRTPORT + 1, pos >> 8);
   outb(CRTPORT, 15);
   outb(CRTPORT + 1, pos);
-
 }
 
 #define INPUT_BUF 128
@@ -269,7 +269,6 @@ void consputc(int c)
     uartputc(c);
   cgaputc(c);
 }
-
 
 void clearConsoleLine()
 {
