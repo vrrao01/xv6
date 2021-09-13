@@ -130,6 +130,8 @@ void panic(char *s)
 #define BACKSPACE 0x100
 #define LEFT_ARROW 228
 #define RIGHT_ARROW 229
+#define UP_ARROW 226
+#define DOWN_ARROW 227
 #define CRTPORT 0x3d4
 static ushort *crt = (ushort *)P2V(0xb8000); // CGA memory
 int max_pos = 0;                             // Position of rightmost character
@@ -200,6 +202,7 @@ cgaputc(int c)
 }
 
 #define INPUT_BUF 128
+#define MAX_HISTORY 16
 struct
 {
   char buf[INPUT_BUF];
@@ -208,6 +211,15 @@ struct
   uint e; // Edit index
   uint m; // Rightmost character index
 } input;
+
+struct
+{
+  char buffer[MAX_HISTORY][INPUT_BUF];
+  int head;
+  int tail;
+  int currentIndex;
+  char partialBuffer[INPUT_BUF];
+} history;
 
 void consputc(int c)
 {
@@ -233,7 +245,7 @@ void consputc(int c)
   {
     uartputc('\b');
     /*
-    
+    Shift all characters to the right of cursor, one position to the left.
     */
     for (uint t = input.e; t < input.m; t++)
     {
@@ -242,6 +254,9 @@ void consputc(int c)
     }
     uartputc(' ');
     uartputc('\b');
+    /*
+    Move serial port cursor to correct edit position.
+    */
     for (uint t = input.e; t < input.m; t++)
     {
       uartputc('\b');
@@ -252,12 +267,87 @@ void consputc(int c)
   cgaputc(c);
 }
 
+void clearConsoleLine()
+{
+  for (int i = input.e; i < input.m; i++)
+  {
+    consputc(RIGHT_ARROW);
+  }
+  for (int i = input.r; i < input.m; i++)
+  {
+    consputc(BACKSPACE);
+  }
+}
+
+void clearInputBufferLine()
+{
+  input.m = input.r;
+  input.e = input.r;
+}
+
+void copyHistorytoInputBuffer()
+{
+  for (int i = 0; i < INPUT_BUF; i++)
+  {
+    if (history.buffer[history.currentIndex][i] == 0)
+      break;
+    input.buf[(input.r + i) % INPUT_BUF] = history.buffer[history.currentIndex][i];
+    input.e++;
+    input.m++;
+  }
+}
+
+void savePartialCommand()
+{
+  memset(history.partialBuffer, 0, INPUT_BUF);
+  for (int i = input.r; i < input.m; i++)
+  {
+    history.partialBuffer[i - input.r] = input.buf[i % INPUT_BUF];
+  }
+}
+
+void copyPartialToInputBuffer()
+{
+  for (int i = 0; i < INPUT_BUF; i++)
+  {
+    if (history.partialBuffer[i] == 0)
+      break;
+    input.buf[(input.r + i) % INPUT_BUF] = history.partialBuffer[i];
+    input.e++;
+    input.m++;
+  }
+}
+
+void saveHistory()
+{
+  if (history.buffer[history.head][0] == 0)
+  {
+    int length = input.m - input.r;
+    for (int i = 0; i < length; i++)
+    {
+      history.buffer[history.tail][i] = input.buf[(input.r + i) % INPUT_BUF];
+    }
+  }
+  else
+  {
+    history.tail = (history.tail + 1) % MAX_HISTORY;
+    if (history.tail == history.head)
+      history.head = (history.head + 1) % MAX_HISTORY;
+    int length = input.m - input.r;
+    memset(history.buffer[history.tail], 0, INPUT_BUF);
+    for (int i = 0; i < length; i++)
+    {
+      history.buffer[history.tail][i] = input.buf[(input.r + i) % INPUT_BUF];
+    }
+  }
+  history.currentIndex = -1;
+}
 #define C(x) ((x) - '@') // Control-x
 
 void consoleintr(int (*getc)(void))
 {
   int c, doprocdump = 0;
-
+  // uint tempIndex;
   acquire(&cons.lock);
   while ((c = getc()) >= 0)
   {
@@ -300,6 +390,49 @@ void consoleintr(int (*getc)(void))
         input.e++;
       }
       break;
+    case UP_ARROW:
+      if (history.buffer[history.head][0] != 0)
+      {
+        clearConsoleLine();
+        if (history.currentIndex == -1)
+        {
+          history.currentIndex = history.tail;
+          savePartialCommand();
+        }
+        else if (history.currentIndex != history.head)
+          history.currentIndex = (history.currentIndex + MAX_HISTORY - 1) % MAX_HISTORY;
+        clearInputBufferLine();
+        release(&cons.lock);
+        cprintf(history.buffer[history.currentIndex]);
+        acquire(&cons.lock);
+        copyHistorytoInputBuffer();
+      }
+      break;
+    case DOWN_ARROW:
+      if (history.buffer[history.head][0] != 0)
+      {
+        if (history.currentIndex == history.tail)
+        {
+          history.currentIndex = -1;
+          clearConsoleLine();
+          clearInputBufferLine();
+          release(&cons.lock);
+          cprintf(history.partialBuffer);
+          acquire(&cons.lock);
+          copyPartialToInputBuffer();
+        }
+        else if (history.currentIndex != -1)
+        {
+          history.currentIndex = (history.currentIndex + 1) % MAX_HISTORY;
+          clearConsoleLine();
+          clearInputBufferLine();
+          copyHistorytoInputBuffer();
+          release(&cons.lock);
+          cprintf(history.buffer[history.currentIndex]);
+          acquire(&cons.lock);
+        }
+      }
+      break;
     default:
       if (c != 0 && input.e - input.r < INPUT_BUF)
       {
@@ -325,6 +458,7 @@ void consoleintr(int (*getc)(void))
         if (c == '\n' || c == C('D') || input.e == input.r + INPUT_BUF)
         {
           input.w = input.e;
+          saveHistory();
           wakeup(&input.r);
         }
       }
