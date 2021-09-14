@@ -269,7 +269,28 @@ void consputc(int c)
     }
   }
   else
-    uartputc(c);
+  {
+    if (input.e < input.m)
+    {
+      char fill, temp;
+      fill = c;
+      for (int i = input.e; i <= input.m; i++)
+      {
+        temp = input.buf[i % INPUT_BUF];
+        uartputc(fill);
+        fill = temp;
+      }
+      for (int i = input.e; i < input.m; i++)
+      {
+        uartputc('\b');
+      }
+    }
+    else
+    {
+      uartputc(c);
+    }
+  }
+
   cgaputc(c);
 }
 
@@ -284,7 +305,11 @@ void clearConsoleLine()
   }
   for (int i = input.r; i < input.m; i++)
   {
-    consputc(BACKSPACE); // Clears text by repeated BACKSPACEs
+    uartputc('\b');
+    uartputc(' ');
+    uartputc('\b');
+    cgaputc(BACKSPACE);
+    // consputc(BACKSPACE); // Clears text by repeated BACKSPACEs
   }
 }
 
