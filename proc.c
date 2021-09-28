@@ -396,7 +396,7 @@ scheduler(void)
       c->proc = p;
       switchuvm(p);
       p->state = RUNNING;
-      p->rutime++;
+      p->timeUsed = 0;
       swtch(&(c->scheduler), p->context);
       switchkvm();
 
@@ -610,4 +610,16 @@ updateStats()
     p++;
   }
   release(&ptable.lock);
+}
+
+int 
+updateTimeUsed()
+{
+  int timeUsed;
+  struct proc *curproc = myproc();
+  acquire(&ptable.lock);
+  curproc->timeUsed++;
+  timeUsed = curproc->timeUsed;
+  release(&ptable.lock);
+  return timeUsed;
 }
