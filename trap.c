@@ -99,14 +99,25 @@ void trap(struct trapframe *tf)
     myproc()->killed = 1;
   }
 
-#if defined DEFAULT || SML
+#if defined DEFAULT || defined SML
   // If the time for which current process held the CPU ==  QUANTA, yield()
   int timeUsed = myproc() == 0 ? -1 : myproc()->timeUsed;
   if (myproc() && myproc()->state == RUNNING && timeUsed == QUANTA)
     yield();
 #else
+#ifdef DML
+  // If the time for which current process held the CPU ==  QUANTA, yield()
+  int timeUsed = myproc() == 0 ? -1 : myproc()->timeUsed;
+  if (myproc() && myproc()->state == RUNNING && timeUsed == QUANTA)
+  {
+    // Reduce priority by 1 if complete time quanta is used
+    myproc()->priority = myproc()->priority == 1 ? 1 : myproc()->priority - 1;
+    yield();
+  }
+#else
 #ifdef FCFS
   // Do not preempt the process and hence don't call yield()
+#endif
 #endif
 #endif
   // If current process was killed since we last yielded, it should exit()

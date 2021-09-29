@@ -162,10 +162,11 @@ void userinit(void)
   // writes to be visible, and the lock is also needed
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
-
+#if defined SML || defined DML
   p->state = RUNNABLE;
   ptable.queueTails[p->priority - 1]++;
   ptable.priorityLevels[p->priority - 1][ptable.queueTails[p->priority - 1]] = p;
+#endif
 
   release(&ptable.lock);
 }
@@ -235,7 +236,7 @@ int fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
-#ifdef SML
+#if defined SML || defined DML
   ptable.queueTails[np->priority - 1]++;
   ptable.priorityLevels[np->priority - 1][ptable.queueTails[np->priority - 1]] = np;
 #endif
@@ -474,7 +475,7 @@ void scheduler(void)
       c->proc = 0;
     }
 #else
-#ifdef SML
+#if defined SML || defined DML
     for (int priority = 3; priority >= 1; priority--) // Highest priority first
     {
       while (ptable.queueTails[priority - 1] > -1)
@@ -529,7 +530,7 @@ void yield(void)
   acquire(&ptable.lock); //DOC: yieldlock
   struct proc *p = myproc();
   p->state = RUNNABLE;
-#ifdef SML
+#if defined SML || defined DML
   // Insert process into appropriate priority queue
   ptable.queueTails[p->priority - 1]++;
   ptable.priorityLevels[p->priority - 1][ptable.queueTails[p->priority - 1]] = p;
@@ -614,6 +615,11 @@ wakeup1(void *chan)
       ptable.queueTails[p->priority - 1]++;
       ptable.priorityLevels[p->priority - 1][ptable.queueTails[p->priority - 1]] = p;
 #endif
+#ifdef DML
+      p->priority = 3; // Highest priority after returning from SLEEPING mode
+      ptable.queueTails[p->priority - 1]++;
+      ptable.priorityLevels[p->priority - 1][ptable.queueTails[p->priority - 1]] = p;
+#endif
       p->state = RUNNABLE;
     }
 }
@@ -642,7 +648,7 @@ int kill(int pid)
       // Wake process from sleep if necessary.
       if (p->state == SLEEPING)
       {
-#ifdef SML
+#if defined SML || defined DML
         // Enqueue process into appropriate priority queue
         ptable.queueTails[p->priority - 1]++;
         ptable.priorityLevels[p->priority - 1][ptable.queueTails[p->priority - 1]] = p;

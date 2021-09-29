@@ -102,7 +102,7 @@ int exec(char *path, char **argv)
   curproc->tf->eip = elf.entry; // main
   curproc->tf->esp = sp;
 #ifdef DML
-  curproc->priority = 2;
+  curproc->priority = 2; // Default priority
 #endif
   switchuvm(curproc);
   freevm(oldpgdir);
