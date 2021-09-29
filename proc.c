@@ -419,6 +419,7 @@ void scheduler(void)
         {
           if (p->state != RUNNABLE)
             continue;
+          // cprintf("Scheduler found p=%d\n",p->pid);
 
           // Switch to chosen process.  It is the process's job
           // to release ptable.lock and then reacquire it
@@ -438,14 +439,14 @@ void scheduler(void)
     #else
 
     #ifdef FCFS
-      struct proc *firstProc = NULL;
+      struct proc *firstProc = 0;
       for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
       {
         if (p->state != RUNNABLE)
           continue;
 
         //find process with earliest ctime
-        if(firstProc==NULL){
+        if(firstProc==0){
           firstProc = p;
         }else{
           if(firstProc->ctime>p->ctime){
@@ -692,12 +693,15 @@ void updateStats()
 // Increases time used by process. Used to check if time quanta is exhausted in trap.c
 int updateTimeUsed()
 {
-  int timeUsed;
+
+  int timeUsed = -1;
   struct proc *curproc = myproc();
-  acquire(&ptable.lock);
-  curproc->timeUsed++;
-  timeUsed = curproc->timeUsed;
-  release(&ptable.lock);
+  if (curproc != 0) {
+    acquire(&ptable.lock);
+    curproc->timeUsed++;
+    timeUsed = curproc->timeUsed;
+    release(&ptable.lock);
+  }
   return timeUsed;
 }
 
@@ -713,7 +717,7 @@ int set_prio(int priority)
   curproc->priority = priority;
   if (curproc->state == RUNNABLE && oldPriority != priority) { 
     // Remove process from old priority queue and insert into new
-    int index;
+    int index = 0;
     for (int i=0; i <= ptable.queueTails[oldPriority-1]; i++) {
       if (ptable.priorityLevels[oldPriority-1][i] == curproc) {
         index = i;

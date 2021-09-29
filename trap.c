@@ -37,7 +37,7 @@ idtinit(void)
 void
 trap(struct trapframe *tf)
 {
-  int timeUsed;
+  // cprintf("%d In trap with\n ",ticks);
   if(tf->trapno == T_SYSCALL){
     if(myproc()->killed)
       exit();
@@ -54,7 +54,7 @@ trap(struct trapframe *tf)
       acquire(&tickslock);
       ticks++;
       updateStats();
-      timeUsed = updateTimeUsed();      
+      updateTimeUsed();
       wakeup(&ticks);
       release(&tickslock);
     }
@@ -101,7 +101,7 @@ trap(struct trapframe *tf)
   #ifdef FCFS
   //Do not Yield
   #else
-  #if defined DEFAULT || SML
+  #ifdef DEFAULT
   // Force process exit if it has been killed and is in user space.
   // (If it is still executing in the kernel, let it keep running
   // until it gets to the regular system call return.)
@@ -110,8 +110,8 @@ trap(struct trapframe *tf)
   
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
-  if(myproc() && myproc()->state == RUNNING &&
-     tf->trapno == T_IRQ0+IRQ_TIMER  && timeUsed==QUANTA)
+  int timeUsed = myproc()==0?-1:myproc()->timeUsed;
+  if(myproc() && myproc()->state == RUNNING && timeUsed == QUANTA)
     yield();
   #endif
   #endif
