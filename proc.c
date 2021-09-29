@@ -162,8 +162,8 @@ void userinit(void)
   // writes to be visible, and the lock is also needed
   // because the assignment might not be atomic.
   acquire(&ptable.lock);
-#if defined SML || defined DML
   p->state = RUNNABLE;
+#if defined SML || defined DML
   ptable.queueTails[p->priority - 1]++;
   ptable.priorityLevels[p->priority - 1][ptable.queueTails[p->priority - 1]] = p;
 #endif
