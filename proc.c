@@ -100,7 +100,7 @@ found:
   p->retime = 0;
   p->rutime = 0;
   p->stime = 0;
-  p->priority = 2; // Every process starts with priority 2
+  p->priority = 0; 
 
   release(&ptable.lock);
 
@@ -144,7 +144,7 @@ void userinit(void)
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
   p->sz = PGSIZE;
   p->ctime = ticks;
-  p->priority = 2;
+  p->priority = 2; // Initial process has priority = 2
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
