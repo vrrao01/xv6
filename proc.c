@@ -700,3 +700,15 @@ int updateTimeUsed()
   release(&ptable.lock);
   return timeUsed;
 }
+
+//set_prio system call
+int set_prio(int priority)
+{
+  if(priority<1) return 1;
+  if(priority>3) return 1;
+  struct proc *curproc = myproc();
+  acquire(&ptable.lock);
+  curproc->priority = priority;
+  release(&ptable.lock);
+  return 0;
+}
