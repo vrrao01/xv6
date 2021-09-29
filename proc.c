@@ -136,6 +136,8 @@ void userinit(void)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
   p->sz = PGSIZE;
+  p->ctime = ticks;
+  p->priority = 2;
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -211,7 +213,7 @@ int fork(void)
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
-
+  np->priority = curproc->priority;
   for (i = 0; i < NOFILE; i++)
     if (curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
@@ -362,6 +364,7 @@ int wait2(int *retime, int *rutime, int *stime)
         p->rutime = 0;
         p->ctime = 0;
         p->stime = 0;
+        p->priority = 0;
         release(&ptable.lock);
         return pid;
       }
@@ -401,51 +404,60 @@ void scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
 
-#ifdef DEFAULT
-    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    {
-      if (p->state != RUNNABLE)
-        continue;
+    #ifdef DEFAULT
+        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+        {
+          if (p->state != RUNNABLE)
+            continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      p->timeUsed = 0;
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+          // Switch to chosen process.  It is the process's job
+          // to release ptable.lock and then reacquire it
+          // before jumping back to us.
+          c->proc = p;
+          switchuvm(p);
+          p->state = RUNNING;
+          p->timeUsed = 0;
+          swtch(&(c->scheduler), p->context);
+          switchkvm();
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          c->proc = 0;
+        }
 
-#else
+    #else
 
-#ifdef FCFS
-    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    {
-      if (p->state != RUNNABLE)
-        continue;
+    #ifdef FCFS
+      struct proc *firstProc = NULL;
+      for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+      {
+        if (p->state != RUNNABLE)
+          continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
-      p->timeUsed = 0;
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+        //find process with earliest ctime
+        if(firstProc==NULL){
+          firstProc = p;
+        }else{
+          if(firstProc->ctime>p->ctime){
+            firstProc = p;
+          }
+        }
+      }
+      if(firstProc){
+        p = firstProc;
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+          
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
-    }
-#endif
-#endif
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
+    #endif
+    #endif
     release(&ptable.lock);
   }
 }
