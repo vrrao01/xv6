@@ -11,6 +11,8 @@ struct
 {
   struct spinlock lock;
   struct proc proc[NPROC];
+  struct proc* priorityLevels[3][NPROC];
+  int queueTails[3];
 } ptable;
 
 static struct proc *initproc;
@@ -24,6 +26,10 @@ static void wakeup1(void *chan);
 void pinit(void)
 {
   initlock(&ptable.lock, "ptable");
+  // Initialise tail pointers
+  ptable.queueTails[0] = -1;
+  ptable.queueTails[1] = -1;
+  ptable.queueTails[2] = -1;
 }
 
 // Must be called with interrupts disabled
@@ -94,6 +100,7 @@ found:
   p->retime = 0;
   p->rutime = 0;
   p->stime = 0;
+  p->priority = 2; // Every process starts with priority 2
 
   release(&ptable.lock);
 
@@ -157,6 +164,8 @@ void userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
+  ptable.queueTails[p->priority-1]++;
+  ptable.priorityLevels[p->priority-1][ptable.queueTails[p->priority-1]] = p;
 
   release(&ptable.lock);
 }
@@ -213,7 +222,7 @@ int fork(void)
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
-  np->priority = curproc->priority;
+  np->priority = curproc->priority; // Child inherits parent's priority
   for (i = 0; i < NOFILE; i++)
     if (curproc->ofile[i])
       np->ofile[i] = filedup(curproc->ofile[i]);
@@ -226,6 +235,8 @@ int fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  ptable.queueTails[np->priority-1]++;
+  ptable.priorityLevels[np->priority-1][ptable.queueTails[np->priority-1]] = np;
 
   release(&ptable.lock);
 
@@ -364,7 +375,6 @@ int wait2(int *retime, int *rutime, int *stime)
         p->rutime = 0;
         p->ctime = 0;
         p->stime = 0;
-        p->priority = 0;
         release(&ptable.lock);
         return pid;
       }
@@ -456,6 +466,22 @@ void scheduler(void)
         // It should have changed its p->state before coming back.
         c->proc = 0;
       }
+    #else
+    #ifdef SML
+    for(int priority = 1; priority <= 3; priority++) {
+      while(ptable.queueTails[priority-1] > -1) {
+        p = ptable.priorityLevels[priority-1][0];
+        for (int i = 0; i < ptable.queueTails[priority-1]; i++) {
+          ptable.priorityLevels[priority-1][i] = ptable.priorityLevels[priority-1][i + 1];
+        }
+        ptable.queueTails[priority-1]--;
+        switchuvm(p);
+        p->state = RUNNING;
+        swtch(&c->scheduler, p->context);
+        switchkvm();
+      }
+    }
+    #endif
     #endif
     #endif
     release(&ptable.lock);

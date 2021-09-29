@@ -99,7 +99,7 @@ trap(struct trapframe *tf)
   #ifdef FCFS
   //Do not Yield
   #else
-
+  #ifdef DEFAULT
   // Force process exit if it has been killed and is in user space.
   // (If it is still executing in the kernel, let it keep running
   // until it gets to the regular system call return.)
@@ -111,6 +111,7 @@ trap(struct trapframe *tf)
   if(myproc() && myproc()->state == RUNNING &&
      tf->trapno == T_IRQ0+IRQ_TIMER  && timeUsed==QUANTA)
     yield();
+  #endif
   #endif
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
