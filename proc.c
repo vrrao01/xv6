@@ -11,7 +11,7 @@ struct
 {
   struct spinlock lock;
   struct proc proc[NPROC];
-  struct proc* priorityLevels[3][NPROC];
+  struct proc *priorityLevels[3][NPROC];
   int queueTails[3];
 } ptable;
 
@@ -100,7 +100,7 @@ found:
   p->retime = 0;
   p->rutime = 0;
   p->stime = 0;
-  p->priority = 0; 
+  p->priority = 0;
 
   release(&ptable.lock);
 
@@ -164,8 +164,8 @@ void userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
-  ptable.queueTails[p->priority-1]++;
-  ptable.priorityLevels[p->priority-1][ptable.queueTails[p->priority-1]] = p;
+  ptable.queueTails[p->priority - 1]++;
+  ptable.priorityLevels[p->priority - 1][ptable.queueTails[p->priority - 1]] = p;
 
   release(&ptable.lock);
 }
@@ -235,9 +235,10 @@ int fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
-  ptable.queueTails[np->priority-1]++;
-  ptable.priorityLevels[np->priority-1][ptable.queueTails[np->priority-1]] = np;
-
+#ifdef SML
+  ptable.queueTails[np->priority - 1]++;
+  ptable.priorityLevels[np->priority - 1][ptable.queueTails[np->priority - 1]] = np;
+#endif
   release(&ptable.lock);
 
   return pid;
@@ -414,77 +415,85 @@ void scheduler(void)
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
 
-    #ifdef DEFAULT
-        for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-        {
-          if (p->state != RUNNABLE)
-            continue;
-          // cprintf("Scheduler found p=%d\n",p->pid);
+#ifdef DEFAULT
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    {
+      if (p->state != RUNNABLE)
+        continue;
+      // cprintf("Scheduler found p=%d\n",p->pid);
 
-          // Switch to chosen process.  It is the process's job
-          // to release ptable.lock and then reacquire it
-          // before jumping back to us.
-          c->proc = p;
-          switchuvm(p);
-          p->state = RUNNING;
-          p->timeUsed = 0;
-          swtch(&(c->scheduler), p->context);
-          switchkvm();
+      // Switch to chosen process.  It is the process's job
+      // to release ptable.lock and then reacquire it
+      // before jumping back to us.
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
+      p->timeUsed = 0;
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
 
-          // Process is done running for now.
-          // It should have changed its p->state before coming back.
-          c->proc = 0;
-        }
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
 
-    #else
+#else
 
-    #ifdef FCFS
-      struct proc *firstProc = 0;
-      for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+#ifdef FCFS
+    struct proc *firstProc = 0;
+    for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
+    {
+      if (p->state != RUNNABLE)
+        continue;
+
+      //find process with earliest ctime
+      if (firstProc == 0)
       {
-        if (p->state != RUNNABLE)
-          continue;
-
-        //find process with earliest ctime
-        if(firstProc==0){
+        firstProc = p;
+      }
+      else
+      {
+        if (firstProc->ctime > p->ctime)
+        {
           firstProc = p;
-        }else{
-          if(firstProc->ctime>p->ctime){
-            firstProc = p;
-          }
         }
       }
-      if(firstProc){
-        p = firstProc;
-        c->proc = p;
-        switchuvm(p);
-        p->state = RUNNING;
-          
-        swtch(&(c->scheduler), p->context);
-        switchkvm();
+    }
+    if (firstProc)
+    {
+      p = firstProc;
+      c->proc = p;
+      switchuvm(p);
+      p->state = RUNNING;
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-      }
-    #else
-    #ifdef SML
-    for(int priority = 3; priority >= 1; priority--) {
-      while(ptable.queueTails[priority-1] > -1) {
-        p = ptable.priorityLevels[priority-1][0];
-        for (int i = 0; i < ptable.queueTails[priority-1]; i++) {
-          ptable.priorityLevels[priority-1][i] = ptable.priorityLevels[priority-1][i + 1];
+      swtch(&(c->scheduler), p->context);
+      switchkvm();
+
+      // Process is done running for now.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+    }
+#else
+#ifdef SML
+    for (int priority = 3; priority >= 1; priority--) // Highest priority first
+    {
+      while (ptable.queueTails[priority - 1] > -1)
+      {
+        p = ptable.priorityLevels[priority - 1][0];
+        for (int i = 0; i < ptable.queueTails[priority - 1]; i++)
+        {
+          ptable.priorityLevels[priority - 1][i] = ptable.priorityLevels[priority - 1][i + 1];
         }
-        ptable.queueTails[priority-1]--;
+        ptable.queueTails[priority - 1]--;
         switchuvm(p);
         p->state = RUNNING;
         swtch(&c->scheduler, p->context);
         switchkvm();
       }
     }
-    #endif
-    #endif
-    #endif
+#endif
+#endif
+#endif
     release(&ptable.lock);
   }
 }
@@ -518,7 +527,13 @@ void sched(void)
 void yield(void)
 {
   acquire(&ptable.lock); //DOC: yieldlock
-  myproc()->state = RUNNABLE;
+  struct proc *p = myproc();
+  p->state = RUNNABLE;
+#ifdef SML
+  // Insert process into appropriate priority queue
+  ptable.queueTails[p->priority - 1]++;
+  ptable.priorityLevels[p->priority - 1][ptable.queueTails[p->priority - 1]] = p;
+#endif
   sched();
   release(&ptable.lock);
 }
@@ -549,7 +564,6 @@ void forkret(void)
 void sleep(void *chan, struct spinlock *lk)
 {
   struct proc *p = myproc();
-
   if (p == 0)
     panic("sleep");
 
@@ -594,7 +608,14 @@ wakeup1(void *chan)
 
   for (p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if (p->state == SLEEPING && p->chan == chan)
+    {
+#ifdef SML
+      // Enqueue process into appropriate priority queue
+      ptable.queueTails[p->priority - 1]++;
+      ptable.priorityLevels[p->priority - 1][ptable.queueTails[p->priority - 1]] = p;
+#endif
       p->state = RUNNABLE;
+    }
 }
 
 // Wake up all processes sleeping on chan.
@@ -620,7 +641,14 @@ int kill(int pid)
       p->killed = 1;
       // Wake process from sleep if necessary.
       if (p->state == SLEEPING)
+      {
+#ifdef SML
+        // Enqueue process into appropriate priority queue
+        ptable.queueTails[p->priority - 1]++;
+        ptable.priorityLevels[p->priority - 1][ptable.queueTails[p->priority - 1]] = p;
+#endif
         p->state = RUNNABLE;
+      }
       release(&ptable.lock);
       return 0;
     }
@@ -696,7 +724,8 @@ int updateTimeUsed()
 
   int timeUsed = -1;
   struct proc *curproc = myproc();
-  if (curproc != 0) {
+  if (curproc != 0)
+  {
     acquire(&ptable.lock);
     curproc->timeUsed++;
     timeUsed = curproc->timeUsed;
@@ -705,31 +734,37 @@ int updateTimeUsed()
   return timeUsed;
 }
 
-// Sets process priority 
+// Sets process priority
 int set_prio(int priority)
 {
   int oldPriority;
-  if(priority<1) return 1;
-  if(priority>3) return 1;
+  if (priority < 1)
+    return 1;
+  if (priority > 3)
+    return 1;
   struct proc *curproc = myproc();
   oldPriority = curproc->priority;
   acquire(&ptable.lock);
   curproc->priority = priority;
-  if (curproc->state == RUNNABLE && oldPriority != priority) { 
+  if (curproc->state == RUNNABLE && oldPriority != priority)
+  {
     // Remove process from old priority queue and insert into new
     int index = 0;
-    for (int i=0; i <= ptable.queueTails[oldPriority-1]; i++) {
-      if (ptable.priorityLevels[oldPriority-1][i] == curproc) {
+    for (int i = 0; i <= ptable.queueTails[oldPriority - 1]; i++)
+    {
+      if (ptable.priorityLevels[oldPriority - 1][i] == curproc)
+      {
         index = i;
         break;
       }
     }
-    for (int i=index; i<= ptable.queueTails[oldPriority-1]; i++) {
-      ptable.priorityLevels[oldPriority-1][i] = ptable.priorityLevels[oldPriority-1][i+1];
+    for (int i = index; i <= ptable.queueTails[oldPriority - 1]; i++)
+    {
+      ptable.priorityLevels[oldPriority - 1][i] = ptable.priorityLevels[oldPriority - 1][i + 1];
     }
-    ptable.queueTails[oldPriority-1]--;
-    ptable.queueTails[priority-1]++;
-    ptable.priorityLevels[priority-1][ptable.queueTails[priority-1]] = curproc;
+    ptable.queueTails[oldPriority - 1]--;
+    ptable.queueTails[priority - 1]++;
+    ptable.priorityLevels[priority - 1][ptable.queueTails[priority - 1]] = curproc;
   }
   release(&ptable.lock);
   return 0;

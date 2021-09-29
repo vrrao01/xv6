@@ -10,47 +10,47 @@
 
 // Interrupt descriptor table (shared by all CPUs).
 struct gatedesc idt[256];
-extern uint vectors[];  // in vectors.S: array of 256 entry pointers
+extern uint vectors[]; // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
 extern int updateTimeUsed(void);
 
-void
-tvinit(void)
+void tvinit(void)
 {
   int i;
 
-  for(i = 0; i < 256; i++)
-    SETGATE(idt[i], 0, SEG_KCODE<<3, vectors[i], 0);
-  SETGATE(idt[T_SYSCALL], 1, SEG_KCODE<<3, vectors[T_SYSCALL], DPL_USER);
+  for (i = 0; i < 256; i++)
+    SETGATE(idt[i], 0, SEG_KCODE << 3, vectors[i], 0);
+  SETGATE(idt[T_SYSCALL], 1, SEG_KCODE << 3, vectors[T_SYSCALL], DPL_USER);
 
   initlock(&tickslock, "time");
 }
 
-void
-idtinit(void)
+void idtinit(void)
 {
   lidt(idt, sizeof(idt));
 }
 
 //PAGEBREAK: 41
-void
-trap(struct trapframe *tf)
+void trap(struct trapframe *tf)
 {
   // cprintf("%d In trap with\n ",ticks);
-  if(tf->trapno == T_SYSCALL){
-    if(myproc()->killed)
+  if (tf->trapno == T_SYSCALL)
+  {
+    if (myproc()->killed)
       exit();
     myproc()->tf = tf;
     syscall();
-    if(myproc()->killed)
+    if (myproc()->killed)
       exit();
     return;
   }
 
-  switch(tf->trapno){
+  switch (tf->trapno)
+  {
   case T_IRQ0 + IRQ_TIMER:
-    if(cpuid() == 0){
+    if (cpuid() == 0)
+    {
       acquire(&tickslock);
       ticks++;
       updateStats();
@@ -64,7 +64,7 @@ trap(struct trapframe *tf)
     ideintr();
     lapiceoi();
     break;
-  case T_IRQ0 + IRQ_IDE+1:
+  case T_IRQ0 + IRQ_IDE + 1:
     // Bochs generates spurious IDE1 interrupts.
     break;
   case T_IRQ0 + IRQ_KBD:
@@ -84,7 +84,8 @@ trap(struct trapframe *tf)
 
   //PAGEBREAK: 13
   default:
-    if(myproc() == 0 || (tf->cs&3) == 0){
+    if (myproc() == 0 || (tf->cs & 3) == 0)
+    {
       // In kernel, it must be our mistake.
       cprintf("unexpected trap %d from cpu %d eip %x (cr2=0x%x)\n",
               tf->trapno, cpuid(), tf->eip, rcr2());
@@ -98,24 +99,17 @@ trap(struct trapframe *tf)
     myproc()->killed = 1;
   }
 
-  #ifdef FCFS
-  //Do not Yield
-  #else
-  #ifdef DEFAULT
-  // Force process exit if it has been killed and is in user space.
-  // (If it is still executing in the kernel, let it keep running
-  // until it gets to the regular system call return.)
-  if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
-    exit();
-  
-  // Force process to give up CPU on clock tick.
-  // If interrupts were on while locks held, would need to check nlock.
-  int timeUsed = myproc()==0?-1:myproc()->timeUsed;
-  if(myproc() && myproc()->state == RUNNING && timeUsed == QUANTA)
+#if defined DEFAULT || SML
+  // If the time for which current process held the CPU ==  QUANTA, yield()
+  int timeUsed = myproc() == 0 ? -1 : myproc()->timeUsed;
+  if (myproc() && myproc()->state == RUNNING && timeUsed == QUANTA)
     yield();
-  #endif
-  #endif
-  // Check if the process has been killed since we yielded
-  if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
+#else
+#ifdef FCFS
+  // Do not preempt the process and hence don't call yield()
+#endif
+#endif
+  // If current process was killed since we last yielded, it should exit()
+  if (myproc() && myproc()->killed && (tf->cs & 3) == DPL_USER)
     exit();
 }
