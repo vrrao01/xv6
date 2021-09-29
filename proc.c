@@ -468,7 +468,7 @@ void scheduler(void)
       }
     #else
     #ifdef SML
-    for(int priority = 1; priority <= 3; priority++) {
+    for(int priority = 3; priority >= 1; priority--) {
       while(ptable.queueTails[priority-1] > -1) {
         p = ptable.priorityLevels[priority-1][0];
         for (int i = 0; i < ptable.queueTails[priority-1]; i++) {
@@ -689,7 +689,7 @@ void updateStats()
   release(&ptable.lock);
 }
 
-//increases time used by process. Used to check if time quanta is exhausted in trap.c
+// Increases time used by process. Used to check if time quanta is exhausted in trap.c
 int updateTimeUsed()
 {
   int timeUsed;
@@ -701,14 +701,32 @@ int updateTimeUsed()
   return timeUsed;
 }
 
-//set_prio system call
+// Sets process priority 
 int set_prio(int priority)
 {
+  int oldPriority;
   if(priority<1) return 1;
   if(priority>3) return 1;
   struct proc *curproc = myproc();
+  oldPriority = curproc->priority;
   acquire(&ptable.lock);
   curproc->priority = priority;
+  if (curproc->state == RUNNABLE && oldPriority != priority) { 
+    // Remove process from old priority queue and insert into new
+    int index;
+    for (int i=0; i <= ptable.queueTails[oldPriority-1]; i++) {
+      if (ptable.priorityLevels[oldPriority-1][i] == curproc) {
+        index = i;
+        break;
+      }
+    }
+    for (int i=index; i<= ptable.queueTails[oldPriority-1]; i++) {
+      ptable.priorityLevels[oldPriority-1][i] = ptable.priorityLevels[oldPriority-1][i+1];
+    }
+    ptable.queueTails[oldPriority-1]--;
+    ptable.queueTails[priority-1]++;
+    ptable.priorityLevels[priority-1][ptable.queueTails[priority-1]] = curproc;
+  }
   release(&ptable.lock);
   return 0;
 }
