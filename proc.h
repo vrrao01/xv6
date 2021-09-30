@@ -53,6 +53,8 @@ struct proc {
   int stime;                   // Time spent in sleeping state
   int retime;                  // Time spent in ready state
   int rutime;                  // Time spent in running state
+  int timeUsed;                // Number of ticks used from QUANTA
+  int priority;                //Priority of a process. 3 is highest 1 is lowest
 };
 
 // Process memory is laid out contiguously, low addresses first:
