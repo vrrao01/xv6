@@ -38,7 +38,7 @@ int main(int argc, char *argv[])
                 for (int i = 0; i < 100; i++)
                 {
                     double temp = 0;
-                    for (int j = 0; j < 100000; j++)
+                    for (int j = 0; j < 1000000; j++)
                     {
                         temp += 6.42324 * 4.3121;
                         temp -= 6.00001 * 4.812;
