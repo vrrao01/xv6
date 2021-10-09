@@ -27,7 +27,9 @@ int main(int argc, char *argv[])
 			}
 			
             for (int k = 0; k < 100; k++){
-                for (int j = 0; j < 1000000; j++){}
+                for (int j = 0; j < 1000000; j++){
+                    printf(1,"");
+                }
             }
 		    exit(); // children exit here
 		}

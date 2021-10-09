@@ -481,15 +481,19 @@ void scheduler(void)
       while (ptable.queueTails[priority - 1] > -1)
       {
         p = ptable.priorityLevels[priority - 1][0];
+        if(p->state != RUNNABLE)
+        continue;
         for (int i = 0; i < ptable.queueTails[priority - 1]; i++)
         {
           ptable.priorityLevels[priority - 1][i] = ptable.priorityLevels[priority - 1][i + 1];
         }
         ptable.queueTails[priority - 1]--;
+        c->proc = p;
         switchuvm(p);
         p->state = RUNNING;
-        swtch(&c->scheduler, p->context);
+        swtch(&(c->scheduler), p->context);
         switchkvm();
+        
       }
     }
 #endif
