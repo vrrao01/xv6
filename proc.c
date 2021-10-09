@@ -476,13 +476,12 @@ void scheduler(void)
     }
 #else
 #if defined SML || defined DML
+  startAgain:
     for (int priority = 3; priority >= 1; priority--) // Highest priority first
     {
       while (ptable.queueTails[priority - 1] > -1)
       {
         p = ptable.priorityLevels[priority - 1][0];
-        if(p->state != RUNNABLE)
-        continue;
         for (int i = 0; i < ptable.queueTails[priority - 1]; i++)
         {
           ptable.priorityLevels[priority - 1][i] = ptable.priorityLevels[priority - 1][i + 1];
@@ -491,9 +490,10 @@ void scheduler(void)
         c->proc = p;
         switchuvm(p);
         p->state = RUNNING;
+        p->timeUsed = 0;
         swtch(&(c->scheduler), p->context);
         switchkvm();
-        
+        goto startAgain;
       }
     }
 #endif
