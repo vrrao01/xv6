@@ -779,3 +779,24 @@ int set_prio(int priority)
   release(&ptable.lock);
   return 0;
 }
+
+void create_kernel_process(const char *name, void (*entrypoint)())
+{
+  char *sp;
+  struct proc *np = allocproc();
+  if (np == 0)
+  {
+    return;
+  }
+  // Save entrypoint as first instruction in process context
+  np->context->eip = (uint)entrypoint;
+
+  // Exit process when entrypoint returns
+  sp = np->kstack + KSTACKSIZE;
+  sp -= sizeof *np->tf;
+  sp -= 4;
+  *(uint *)sp = (uint)exit;
+
+  // Save name of process
+  safestrcpy(np->name, name, sizeof(name));
+}
