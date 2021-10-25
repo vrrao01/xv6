@@ -124,6 +124,13 @@ void            wakeup(void*);
 void            yield(void);
 int             set_prio(int);
 
+// paging.c
+void            swapOut(void);
+void            swapIn(void);
+void            requestSwapOut(void);
+void            requestSwapIn(void);
+
+
 // swtch.S
 void            swtch(struct context**, struct context*);
 
