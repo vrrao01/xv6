@@ -335,7 +335,6 @@ void scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
-  cprintf("start sched\n");
 
   for (;;)
   {
@@ -353,7 +352,6 @@ void scheduler(void)
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
       c->proc = p;
-      cprintf("Scheduled %p %s\n", p->pid, p->name);
       switchuvm(p);
       p->state = RUNNING;
 
@@ -555,19 +553,19 @@ void create_kernel_process(const char *name, void (*entrypoint)())
   {
     return;
   }
-  // Save entrypoint as first instruction in process context
-  np->context->eip = (uint)entrypoint;
+  // Save forkret as first instruction to release ptable lock held by scheduler
+  np->context->eip = (uint)forkret;
 
-  // Exit process when entrypoint returns
+  // Execute entrypoint after forkret returns
   sp = np->kstack + KSTACKSIZE;
   sp -= sizeof *np->tf;
   sp -= 4;
-  *(uint *)sp = (uint)exit;
+  *(uint *)sp = (uint)entrypoint;
 
   // Save name of process
   safestrcpy(np->name, name, 16);
 
-  // Set up page directory
+  // Set up page directory and other details
   if ((np->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
   np->sz = PGSIZE;

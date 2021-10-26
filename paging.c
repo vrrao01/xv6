@@ -27,12 +27,20 @@ struct proc *dequeue(struct swapRequests *q)
 void swapOut()
 {
     cprintf("Running swapOut\n");
-    procdump();
+    acquire(&ptable.lock);
+    for (int i = 0; i < NPROC; i++)
+    {
+        if (ptable.proc[i].state == RUNNING)
+        {
+            cprintf("%s \n", ptable.proc[i].name);
+        }
+    }
+    release(&ptable.lock);
     exit();
 }
+
 void swapIn()
 {
     cprintf("Running swapIn\n");
-    procdump();
     exit();
 }

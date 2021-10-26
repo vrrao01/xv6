@@ -6,6 +6,12 @@ struct swapRequests
     int tail;
 };
 
+extern struct
+{
+    struct spinlock lock;
+    struct proc proc[NPROC];
+} ptable;
+
 void enqueue(struct swapRequests *);
 struct proc *dequeue(struct swapRequests *);
 void swapOut();
