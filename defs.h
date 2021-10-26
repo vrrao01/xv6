@@ -21,7 +21,6 @@ void            consoleinit(void);
 void            cprintf(char*, ...);
 void            consoleintr(int(*)(void));
 void            panic(char*) __attribute__((noreturn));
-int             history(char*,int);
 
 // exec.c
 int             exec(char*, char**);
@@ -119,17 +118,8 @@ void            setproc(struct proc*);
 void            sleep(void*, struct spinlock*);
 void            userinit(void);
 int             wait(void);
-int             wait2(int*, int*, int*);
 void            wakeup(void*);
 void            yield(void);
-int             set_prio(int);
-
-// paging.c
-void            swapOut(void);
-void            swapIn(void);
-void            requestSwapOut(void);
-void            requestSwapIn(void);
-
 
 // swtch.S
 void            swtch(struct context**, struct context*);
@@ -195,7 +185,6 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
-int             handle_page_fault(pde_t *pgdir, uint vm);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
