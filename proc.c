@@ -6,6 +6,8 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#define PAGING
+#include "paging.h"
 
 struct
 {
@@ -24,6 +26,8 @@ static void wakeup1(void *chan);
 void pinit(void)
 {
   initlock(&ptable.lock, "ptable");
+  initlock(&swapInQueue.lock, "swapInQueue");
+  initlock(&swapOutQueue.lock, "swapOutQueue");
 }
 
 // Must be called with interrupts disabled
