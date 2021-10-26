@@ -120,6 +120,13 @@ void            userinit(void);
 int             wait(void);
 void            wakeup(void*);
 void            yield(void);
+void            create_kernel_process(const char *, void (*p)());
+
+// paging.c
+void            swapOut(void);
+void            swapIn(void);
+void            requestSwapOut(void);
+void            requestSwapIn(void);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
