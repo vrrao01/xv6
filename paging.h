@@ -18,7 +18,11 @@ struct swapRequests swapInQueue, swapOutQueue;
 
 void enqueue(struct swapRequests *);
 struct proc *dequeue(struct swapRequests *);
+int isEmpty(struct swapRequests *);
 void swapOut();
 void swapIn();
 void requestSwapOut();
 void requestSwapIn();
+pde_t *chooseVictim(struct proc **, uint *);
+void getSwapFileName(int, uint, char *);
+void writeSwapPage(uint, int, pte_t *);

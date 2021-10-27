@@ -6,6 +6,7 @@
 #include "x86.h"
 #include "proc.h"
 #include "spinlock.h"
+#include "fcntl.h"
 #define PAGING
 #include "paging.h"
 
@@ -275,6 +276,7 @@ void exit(void)
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
+  // cprintf("EXIT %d\n", myproc()->pid);
   sched();
   panic("zombie exit");
 }
@@ -385,7 +387,12 @@ void sched(void)
   if (!holding(&ptable.lock))
     panic("sched ptable.lock");
   if (mycpu()->ncli != 1)
+
+  {
+    cprintf("ncli = %d\n", mycpu()->ncli);
+    cprintf("p = %s , %d\n", p->name, p->pid);
     panic("sched locks");
+  }
   if (p->state == RUNNING)
     panic("sched running");
   if (readeflags() & FL_IF)
@@ -420,8 +427,8 @@ void forkret(void)
     first = 0;
     iinit(ROOTDEV);
     initlog(ROOTDEV);
-    create_kernel_process("swap_out", &swapOut);
-    create_kernel_process("swap_in", &swapIn);
+    // create_kernel_process("swap_out", &swapOut);
+    // create_kernel_process("swap_in", &swapIn);
   }
 
   // Return to "caller", actually trapret (see allocproc).
@@ -453,7 +460,7 @@ void sleep(void *chan, struct spinlock *lk)
   // Go to sleep.
   p->chan = chan;
   p->state = SLEEPING;
-
+  // cprintf("SLEEPING %d\n", p->pid);
   sched();
 
   // Tidy up.
