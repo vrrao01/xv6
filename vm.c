@@ -235,7 +235,7 @@ int allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
     mem = kalloc();
     if (mem == 0)
     {
-      cprintf("allocuvm out of memory\n");
+      cprintf("%d:allocuvm out of memory\n", myproc()->pid);
       deallocuvm(pgdir, newsz, oldsz);
       return 0;
     }

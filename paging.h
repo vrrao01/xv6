@@ -26,3 +26,7 @@ void requestSwapIn();
 pde_t *chooseVictim(struct proc **, uint *);
 void getSwapFileName(int, uint, char *);
 void writeSwapPage(uint, int, pte_t *);
+void handlePageFault();
+
+#define SWAP_OUT_CHAN 50
+#define SWAP_IN_CHAN 115

@@ -7,6 +7,7 @@
 #include "x86.h"
 #include "traps.h"
 #include "spinlock.h"
+#include "paging.h"
 
 // Interrupt descriptor table (shared by all CPUs).
 struct gatedesc idt[256];
@@ -81,15 +82,13 @@ void trap(struct trapframe *tf)
     if (myproc())
     {
       cprintf("PAGE FAULT by process = %s ", myproc()->name);
-      cprintf("VA = %x \n", rcr2());
+      cprintf("1.VA = %x \n", rcr2());
+      myproc()->pageFaultAddress = rcr2();
+      handlePageFault();
+      break;
     }
   //PAGEBREAK: 13
   default:
-    if (myproc() && tf->trapno == T_PGFLT)
-    {
-      cprintf("PAGE FAULT by process = %s ", myproc()->name);
-      cprintf("VA = %x \n", rcr2());
-    }
     if (myproc() == 0 || (tf->cs & 3) == 0)
     {
       // In kernel, it must be our mistake.

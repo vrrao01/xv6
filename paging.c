@@ -35,6 +35,7 @@ void enqueue(struct swapRequests *q)
         return;
     q->queue[q->tail] = myproc();
     q->tail = (q->tail + 1) % (NPROC + 1);
+    myproc()->swapSatisfied = 0;
 }
 struct proc *dequeue(struct swapRequests *q)
 {
@@ -52,21 +53,68 @@ int isEmpty(struct swapRequests *q)
 
 void swapIn()
 {
-    // release(&ptable.lock);
-    cprintf("Running swapIn\n");
-    char text[14];
-    getSwapFileName(10, 1234567, text);
-    cprintf("GET NAME : %s\n", text);
+    acquire(&swapInQueue.lock);
+    cprintf("Just entered swapin\n");
+    while (1)
+    {
+        if (isEmpty(&swapInQueue) == 0)
+        {
+            // Dequeue to process request
+            struct proc *requester = getHead(&swapInQueue);
+            dequeue(&swapInQueue);
+            release(&swapInQueue.lock);
+            cprintf("Request for swapIn by %d :%x\n", requester->pid, requester->pageFaultAddress);
+
+            // Allocate a new page and copy from swap file
+            char *newPage = kalloc();
+            char fName[16];
+            getSwapFileName(requester->pid, (requester->pageFaultAddress >> 12), fName);
+            int fd = fopen(fName, O_RDONLY);
+            fread(fd, newPage, PGSIZE);
+            fclose(fd);
+
+            // Update page table entry
+            pte_t *pte = getPTE(requester->pgdir, (void *)requester->pageFaultAddress);
+            *pte = *pte | PTE_P;
+            *pte = *pte & ~PTE_SWP;
+            lcr3(V2P(requester->pgdir));
+            requester->swapSatisfied = 1;
+            acquire(&swapInQueue.lock);
+        }
+        wakeup(&requestSwapIn);
+        sleep(&swapInQueue, &swapInQueue.lock);
+    }
     exit();
 }
 
 void requestSwapOut()
 {
+    cprintf("%d requests for swapOut\n", myproc()->pid);
     acquire(&swapOutQueue.lock);
     enqueue(&swapOutQueue);
     wakeup(&swapOutQueue);
     sleep(&requestSwapOut, &swapOutQueue.lock);
+    while (myproc()->swapSatisfied == 0)
+    {
+        sleep(&requestSwapOut, &swapOutQueue.lock);
+    }
+    myproc()->swapSatisfied = 0;
     release(&swapOutQueue.lock);
+}
+
+void requestSwapIn()
+{
+    cprintf("%d requests for swapIn for VA = %x\n", myproc()->pid, myproc()->pageFaultAddress);
+    acquire(&swapInQueue.lock);
+    enqueue(&swapInQueue);
+    wakeup(&swapInQueue);
+    sleep(&requestSwapIn, &swapInQueue.lock);
+    while (myproc()->swapSatisfied == 0)
+    {
+        sleep(&requestSwapIn, &swapInQueue.lock);
+    }
+    myproc()->swapSatisfied = 0;
+    release(&swapInQueue.lock);
 }
 
 pde_t *chooseVictim(struct proc **victim, uint *va)
@@ -77,9 +125,9 @@ pde_t *chooseVictim(struct proc **victim, uint *va)
         for (uint i = 0; i < NPROC; i++)
         {
             // cprintf("i = %d, state = %d, name = %s\n", i, ptable.proc[i].state, ptable.proc[i].name);
-            if (!(ptable.proc[i].state == RUNNABLE || ptable.proc[i].state == ZOMBIE) || ptable.proc[i].pid < 4)
+            if (!(ptable.proc[i].state == RUNNABLE || ptable.proc[i].state == ZOMBIE) || ptable.proc[i].pid < 4 || ptable.proc[i].pid == myproc()->pid)
                 continue;
-            cprintf("Examining %s : %d\n", ptable.proc[i].name, ptable.proc[i].pid);
+            // cprintf("Examining %s : %d\n", ptable.proc[i].name, ptable.proc[i].pid);
             for (int pg = 0; pg < ptable.proc[i].sz; pg += PGSIZE)
             {
                 pde_t *pte = getPTE(ptable.proc[i].pgdir, (char *)pg);
@@ -88,8 +136,8 @@ pde_t *chooseVictim(struct proc **victim, uint *va)
                 int rdBits = getRDBits(pte);
                 if (rdBits == rd)
                 {
-                    cprintf("Victim: pid = %d, va = %x, rd = %d\n", ptable.proc[i].pid, pg, rdBits);
-                    cprintf("Victim flags = %x, name = %s,state = %d\n", PTE_FLAGS(*pte), ptable.proc[i].name, ptable.proc[i].state);
+                    // cprintf("Victim: pid = %d, va = %x, rd = %d\n", ptable.proc[i].pid, pg, rdBits);
+                    // cprintf("Victim flags = %x, name = %s,state = %d\n", PTE_FLAGS(*pte), ptable.proc[i].name, ptable.proc[i].state);
                     *victim = &ptable.proc[i];
                     *va = pg;
                     return pte;
@@ -106,13 +154,13 @@ void swapOut()
     cprintf("Just entered swapout\n");
     while (1)
     {
-        if (!isEmpty(&swapOutQueue))
+        if (isEmpty(&swapOutQueue) == 0)
         {
             // Dequeue to process request
             struct proc *requester = getHead(&swapOutQueue);
             dequeue(&swapOutQueue);
             release(&swapOutQueue.lock);
-            cprintf("Request for swapout by %d %s\n", requester->pid, requester->name);
+            cprintf("Process swapout by %d %s\n", requester->pid, requester->name);
 
             // Find a victim page
             struct proc *victimProcess;
@@ -123,7 +171,7 @@ void swapOut()
 
             // Unset present bit and set swap bit in PTE
             *victimPTE = *victimPTE & ~PTE_P;
-            *victimPTE = *victimPTE & ~PTE_SWP;
+            *victimPTE = *victimPTE | PTE_SWP;
             lcr3(V2P(victimProcess->pgdir));
 
             // Swap out victim page and add to free list
@@ -133,10 +181,11 @@ void swapOut()
             writeSwapPage(victimVA, victimProcess->pid, victimPTE);
             acquire(&ptable.lock);
             victimProcess->state = oldState;
+            victimProcess->swapSatisfied = 1;
             release(&ptable.lock);
             acquire(&swapOutQueue.lock);
-            wakeup(&requestSwapOut);
         }
+        wakeup(&requestSwapOut);
         sleep(&swapOutQueue, &swapOutQueue.lock);
     }
     exit();
@@ -185,11 +234,28 @@ void getSwapFileName(int pid, uint va, char *name)
 void writeSwapPage(uint va, int pid, pte_t *pte)
 {
     char fName[DIRSIZ];
-    getSwapFileName(pid, va, fName);
+    getSwapFileName(pid, (va >> PTXSHIFT), fName);
     cprintf("fName = %s \n", fName);
     int fd = fopen(fName, O_CREATE | O_WRONLY);
     char *victimPage = (char *)P2V(PTE_ADDR(*pte));
     fwrite(fd, victimPage, PGSIZE);
     fclose(fd);
     kfree(victimPage);
+}
+
+void handlePageFault()
+{
+    uint pageFaultVA = myproc()->pageFaultAddress;
+    pte_t *faultPTE = getPTE(myproc()->pgdir, (void *)pageFaultVA);
+    if ((*faultPTE & PTE_SWP) != 0)
+    {
+        cprintf("%d pid's VA = %x was swapped out\n", myproc()->pid, myproc()->pageFaultAddress);
+        myproc()->pageFaultAddress = PGROUNDDOWN(pageFaultVA);
+        requestSwapIn();
+    }
+    else
+    {
+        cprintf("Segmentation Fault: Process accessing outside its address space -- kill proc\n");
+        myproc()->killed = 1;
+    }
 }

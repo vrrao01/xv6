@@ -61,6 +61,8 @@ struct proc
   struct file *ofile[NOFILE]; // Open files
   struct inode *cwd;          // Current directory
   char name[16];              // Process name (debugging)
+  uint pageFaultAddress;      // VA of page that has been swapped out
+  int swapSatisfied;          // Was swapOut request satisfied
 };
 
 // Process memory is laid out contiguously, low addresses first:
