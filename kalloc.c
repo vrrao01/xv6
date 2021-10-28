@@ -81,7 +81,7 @@ char *
 kalloc(void)
 {
   struct run *r;
-
+tryAgain:
   if (kmem.use_lock)
     acquire(&kmem.lock);
   r = kmem.freelist;
@@ -92,6 +92,7 @@ kalloc(void)
     if (kmem.use_lock)
       release(&kmem.lock);
     requestSwapOut();
+    goto tryAgain;
     return (char *)r;
   }
   if (kmem.use_lock)

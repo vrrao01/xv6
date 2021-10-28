@@ -77,7 +77,12 @@ void trap(struct trapframe *tf)
             cpuid(), tf->cs, tf->eip);
     lapiceoi();
     break;
-
+  case T_PGFLT:
+    if (myproc())
+    {
+      cprintf("PAGE FAULT by process = %s ", myproc()->name);
+      cprintf("VA = %x \n", rcr2());
+    }
   //PAGEBREAK: 13
   default:
     if (myproc() && tf->trapno == T_PGFLT)

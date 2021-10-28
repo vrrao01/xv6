@@ -73,9 +73,11 @@ pde_t *chooseVictim(struct proc **victim, uint *va)
 {
     for (int rd = 0; rd <= 3; rd++)
     {
+        // cprintf("rd = %d\n", rd);
         for (uint i = 0; i < NPROC; i++)
         {
-            if (ptable.proc[i].state != 7 || ptable.proc[i].pid < 4)
+            // cprintf("i = %d, state = %d, name = %s\n", i, ptable.proc[i].state, ptable.proc[i].name);
+            if (!(ptable.proc[i].state == RUNNABLE || ptable.proc[i].state == ZOMBIE) || ptable.proc[i].pid < 4)
                 continue;
             cprintf("Examining %s : %d\n", ptable.proc[i].name, ptable.proc[i].pid);
             for (int pg = 0; pg < ptable.proc[i].sz; pg += PGSIZE)
@@ -87,6 +89,7 @@ pde_t *chooseVictim(struct proc **victim, uint *va)
                 if (rdBits == rd)
                 {
                     cprintf("Victim: pid = %d, va = %x, rd = %d\n", ptable.proc[i].pid, pg, rdBits);
+                    cprintf("Victim flags = %x, name = %s,state = %d\n", PTE_FLAGS(*pte), ptable.proc[i].name, ptable.proc[i].state);
                     *victim = &ptable.proc[i];
                     *va = pg;
                     return pte;
@@ -99,38 +102,42 @@ pde_t *chooseVictim(struct proc **victim, uint *va)
 
 void swapOut()
 {
-    // release(&ptable.lock);
-    // int fd = fopen("random.swap", O_CREATE | O_RDWR);
-    // char text[512];
-    // cprintf("fd = %d\n", fd);
-    // fwrite(fd, text, strlen(text));
-    // fclose(fd);
-    // int fd = fopen("README", O_RDONLY);
-    // fread(fd, text, 512);
-    // cprintf("After reading\n");
-    // cprintf("|%s|\n ", text);
-    // fclose(fd);
     acquire(&swapOutQueue.lock);
+    cprintf("Just entered swapout\n");
     while (1)
     {
         if (!isEmpty(&swapOutQueue))
         {
-            cprintf("Request for swapout by %d %s\n", getHead(&swapOutQueue)->pid, getHead(&swapOutQueue)->name);
+            // Dequeue to process request
+            struct proc *requester = getHead(&swapOutQueue);
+            dequeue(&swapOutQueue);
+            release(&swapOutQueue.lock);
+            cprintf("Request for swapout by %d %s\n", requester->pid, requester->name);
+
+            // Find a victim page
             struct proc *victimProcess;
-            // pde_t *victimPTE;
+            pde_t *victimPTE;
             uint victimVA;
             acquire(&ptable.lock);
-            // victimPTE = chooseVictim(&victimProcess, &victimVA);
-            chooseVictim(&victimProcess, &victimVA);
-            // writeSwapPage(victimVA, victimProcess->pid, victimPTE);
-            // updateVictimPage()
-            dequeue(&swapOutQueue);
-            // change satisfied condition
+            victimPTE = chooseVictim(&victimProcess, &victimVA);
+
+            // Unset present bit and set swap bit in PTE
+            *victimPTE = *victimPTE & ~PTE_P;
+            *victimPTE = *victimPTE & ~PTE_SWP;
+            lcr3(V2P(victimProcess->pgdir));
+
+            // Swap out victim page and add to free list
+            int oldState = victimProcess->state;
+            victimProcess->state = BUSY;
             release(&ptable.lock);
+            writeSwapPage(victimVA, victimProcess->pid, victimPTE);
+            acquire(&ptable.lock);
+            victimProcess->state = oldState;
+            release(&ptable.lock);
+            acquire(&swapOutQueue.lock);
             wakeup(&requestSwapOut);
         }
         sleep(&swapOutQueue, &swapOutQueue.lock);
-        cprintf("Swapout sleeping\n");
     }
     exit();
 }
@@ -181,7 +188,8 @@ void writeSwapPage(uint va, int pid, pte_t *pte)
     getSwapFileName(pid, va, fName);
     cprintf("fName = %s \n", fName);
     int fd = fopen(fName, O_CREATE | O_WRONLY);
-    char *victimPage = P2V(PTE_ADDR(*pte));
+    char *victimPage = (char *)P2V(PTE_ADDR(*pte));
     fwrite(fd, victimPage, PGSIZE);
     fclose(fd);
+    kfree(victimPage);
 }
