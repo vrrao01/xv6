@@ -162,9 +162,7 @@ int evictVictimPage(int pid)
             pte = (pte_t *)getPTE(p->pgdir, (void *)i);
             if (!((*pte) & PTE_U) || !((*pte) & PTE_P))
                 continue;
-            int idx = (((*pte) & (uint)96) >> 5);
-            if (idx > 0 && idx < 3)
-                idx = 3 - idx;
+            int idx = getRDBits(pte);
             victimPTE[idx] = pte;
             victimVA[idx] = i;
             victimProcess[idx] = p;
