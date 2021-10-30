@@ -505,6 +505,7 @@ int fopen(char *path, int omode)
   f->off = 0;
   f->readable = !(omode & O_WRONLY);
   f->writable = (omode & O_WRONLY) || (omode & O_RDWR);
+  strncpy(f->name, path, DIRSIZ);
   return fd;
 }
 
@@ -517,18 +518,48 @@ int fclose(int fd)
   return 0;
 }
 
-int fwrite(int fd, char *p, int n)
+int fdelete(char *path)
 {
-  struct file *f;
-  if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-    return -1;
-  return filewrite(f, p, n);
-}
+  struct inode *ip, *dp;
+  struct dirent de;
+  char name[DIRSIZ];
+  uint off;
 
-int fread(int fd, char *p, int n)
-{
-  struct file *f;
-  if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-    return -1;
-  return fileread(f, p, n);
+  begin_op();
+  dp = nameiparent(path, name);
+
+  ilock(dp);
+
+  if (namecmp(name, ".") == 0 || namecmp(name, "..") == 0)
+    goto bad;
+
+  if ((ip = dirlookup(dp, name, &off)) == 0)
+    goto bad;
+  ilock(ip);
+
+  if (ip->nlink < 1)
+    panic("unlink: nlink < 1");
+
+  memset(&de, 0, sizeof(de));
+  if (writei(dp, (char *)&de, off, sizeof(de)) != sizeof(de))
+    panic("unlink: writei");
+  if (ip->type == T_DIR)
+  {
+    dp->nlink--;
+    iupdate(dp);
+  }
+  iunlockput(dp);
+
+  ip->nlink--;
+  iupdate(ip);
+  iunlockput(ip);
+
+  end_op();
+
+  return 0;
+
+bad:
+  iunlockput(dp);
+  end_op();
+  return -1;
 }

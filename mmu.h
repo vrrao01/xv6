@@ -98,11 +98,10 @@ struct segdesc
 #define PGROUNDDOWN(a) (((a)) & ~(PGSIZE - 1))
 
 // Page table/directory entry flags.
-#define PTE_P 0x001   // Present
-#define PTE_W 0x002   // Writeable
-#define PTE_U 0x004   // User
-#define PTE_PS 0x080  // Page Size
-#define PTE_SWP 0x200 // Swapped Out
+#define PTE_P 0x001  // Present
+#define PTE_W 0x002  // Writeable
+#define PTE_U 0x004  // User
+#define PTE_PS 0x080 // Page Size
 
 // Address in page table or page directory entry
 #define PTE_ADDR(pte) ((uint)(pte) & ~0xFFF)

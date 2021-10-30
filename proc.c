@@ -253,6 +253,11 @@ void exit(void)
     }
   }
 
+  if (curproc->parent && curproc->parent->pid == 4)
+  {
+    deleteSwapPages();
+  }
+
   begin_op();
   iput(curproc->cwd);
   end_op();
@@ -276,7 +281,6 @@ void exit(void)
 
   // Jump into the scheduler, never to return.
   curproc->state = ZOMBIE;
-  // cprintf("EXIT %d\n", myproc()->pid);
   sched();
   panic("zombie exit");
 }
@@ -358,6 +362,7 @@ void scheduler(void)
       // to release ptable.lock and then reacquire it
       // before jumping back to us.
       c->proc = p;
+      // cprintf("Sched %d\n", p->pid);
       switchuvm(p);
       p->state = RUNNING;
 
@@ -427,8 +432,8 @@ void forkret(void)
     first = 0;
     iinit(ROOTDEV);
     initlog(ROOTDEV);
-    // create_kernel_process("swap_out", &swapOut);
-    // create_kernel_process("swap_in", &swapIn);
+    create_kernel_process("swap_out", &swapOut);
+    create_kernel_process("swap_in", &swapIn);
   }
 
   // Return to "caller", actually trapret (see allocproc).
@@ -564,14 +569,14 @@ void create_kernel_process(const char *name, void (*entrypoint)())
   {
     return;
   }
-  // Save forkret as first instruction to release ptable lock held by scheduler
-  np->context->eip = (uint)forkret;
+  // Save entrypoint as first instruction to execute
+  np->context->eip = (uint)entrypoint;
 
-  // Execute entrypoint after forkret returns
+  // Execute exit after entrypoint returns
   sp = np->kstack + KSTACKSIZE;
   sp -= sizeof *np->tf;
   sp -= 4;
-  *(uint *)sp = (uint)entrypoint;
+  *(uint *)sp = (uint)exit;
 
   // Save name of process
   safestrcpy(np->name, name, 16);

@@ -6,6 +6,8 @@
 #include "mmu.h"
 #include "proc.h"
 #include "elf.h"
+#include "spinlock.h"
+#include "paging.h"
 
 extern char data[]; // defined by kernel.ld
 pde_t *kpgdir;      // for use in scheduler()
@@ -330,13 +332,10 @@ copyuvm(pde_t *pgdir, uint sz)
   {
     if ((pte = walkpgdir(pgdir, (void *)i, 0)) == 0)
       panic("copyuvm: pte should exist");
-    if (!(*pte & PTE_P))
-    {
-      cprintf("pid = %d, va = %x\n", myproc()->pid, i);
-      // procdump();
-      panic("copyuvm: page not present");
-    }
 
+    *((char *)i) = *((char *)i) + 0;
+    if (!(*pte & PTE_P) && *((char *)i) != *((char *)i) + 0)
+      panic("copyuvm: page not present");
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte);
     if ((mem = kalloc()) == 0)
@@ -399,6 +398,18 @@ int copyout(pde_t *pgdir, uint va, void *p, uint len)
 pte_t *getPTE(pde_t *pgdir, const void *va)
 {
   return walkpgdir(pgdir, va, 0);
+}
+
+int mapSwapIn(pde_t *pgdir, void *va, uint size, uint pa)
+{
+  pte_t *pte = walkpgdir(pgdir, va, 0);
+  uint flags = PTE_FLAGS(*pte);
+  if (flags % 2 == 1)
+    cprintf("Present Set\n");
+  flags = flags & (~((uint)1 << 7));
+  flags = flags & (~((uint)1 << 6));
+  *pte = pa | flags | PTE_P;
+  return 0;
 }
 
 //PAGEBREAK!

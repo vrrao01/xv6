@@ -35,8 +35,7 @@ int filestat(struct file *, struct stat *);
 int filewrite(struct file *, char *, int n);
 int fopen(char *, int);
 int fclose(int);
-int fwrite(int, char *, int);
-int fread(int, char *, int);
+int fdelete(char *);
 
 // fs.c
 void readsb(int dev, struct superblock *sb);

@@ -23,10 +23,8 @@ void swapOut();
 void swapIn();
 void requestSwapOut();
 void requestSwapIn();
-pde_t *chooseVictim(struct proc **, uint *);
 void getSwapFileName(int, uint, char *);
-void writeSwapPage(uint, int, pte_t *);
-void handlePageFault();
-
-#define SWAP_OUT_CHAN 50
-#define SWAP_IN_CHAN 115
+extern int mapSwapIn(pde_t *, void *, uint, uint);
+void deleteSwapPages();
+int fwrite(int, uint, char *);
+int fread(int, uint, char *);
