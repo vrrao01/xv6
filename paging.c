@@ -13,6 +13,9 @@
 #include "stat.h"
 #include "paging.h"
 
+struct swapRequests swapInQueue, swapOutQueue;
+int nSwapOut = 0, nSwapIn = 0;
+
 inline struct proc *getHead(struct swapRequests *q)
 {
     return q->queue[q->head];
@@ -61,24 +64,16 @@ int isEmpty(struct swapRequests *q)
     return q->head == q->tail;
 }
 
-int fread(int pid, uint addr, char *buf)
+void requestSwapIn()
 {
-    char name[14];
-
-    getSwapFileName(pid, addr, name);
-    int fd = fopen(name, O_RDONLY); // Open swapout page file
-    struct file *f;
-    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
-        return -1;
-    int noc = fileread(f, buf, 4096); // Read the page into the buffer
-    if (noc < 0)
-    {
-        cprintf("Unable to write. Exiting (paging.c::fread)!!");
-    }
-    fdelete(name);
-    fclose(fd);
-
-    return noc;
+    acquire(&ptable.lock);
+    acquire(&swapInQueue.lock);
+    enqueue(&swapInQueue);
+    wakeup1(&swapInQueue);
+    release(&swapInQueue.lock);
+    struct proc *p = myproc();
+    sleep((char *)p->pid, &ptable.lock);
+    release(&ptable.lock);
 }
 
 void swapIn()
@@ -99,6 +94,7 @@ void swapIn()
             // Allocate a new page and copy from swap file
             char *newPage = kalloc();
             fread(requester->pid, ((requester->pageFaultAddress) >> PTXSHIFT), newPage);
+            nSwapIn++;
 
             // Update page table entry
             acquire(&swapInQueue.lock);
@@ -114,7 +110,6 @@ void swapIn()
 
 void requestSwapOut()
 {
-    cprintf("%d requests for swapOut\n", myproc()->pid);
     acquire(&ptable.lock);
     acquire(&swapOutQueue.lock);
     enqueue(&swapOutQueue);
@@ -130,17 +125,30 @@ void requestSwapOut()
     release(&ptable.lock);
 }
 
-void requestSwapIn()
+void swapOut()
 {
-    cprintf("%d requests for swapIn for VA = %x\n", myproc()->pid, myproc()->pageFaultAddress);
-    acquire(&ptable.lock);
-    acquire(&swapInQueue.lock);
-    enqueue(&swapInQueue);
-    wakeup1(&swapInQueue);
-    release(&swapInQueue.lock);
-    struct proc *p = myproc();
-    sleep((char *)p->pid, &ptable.lock);
-    release(&ptable.lock);
+    sleep(&swapOutQueue, &ptable.lock);
+    cprintf("Just entered swapout\n");
+    for (;;)
+    {
+        acquire(&swapOutQueue.lock);
+        while (isEmpty(&swapOutQueue) == 0)
+        {
+            // Dequeue to process request
+            struct proc *requester = getHead(&swapOutQueue);
+            dequeue(&swapOutQueue);
+
+            // Select a victim page and evict it
+            evictVictimPage(requester->pid);
+
+            // Set the satisfied field of proc structure to notify process to resume
+            requester->swapSatisfied = 1;
+        }
+        wakeup1(&requestSwapOut);
+        release(&swapOutQueue.lock);
+        sleep(&swapOutQueue, &ptable.lock);
+    }
+    exit();
 }
 
 int evictVictimPage(int pid)
@@ -185,8 +193,10 @@ int evictVictimPage(int pid)
                 release(&swapOutQueue.lock);
                 release(&ptable.lock);
                 fwrite(victimProcess[i]->pid, (victimVA[i]) >> PTXSHIFT, (void *)P2V(PTE_ADDR(*pte)));
+                nSwapOut++;
                 acquire(&swapOutQueue.lock);
                 acquire(&ptable.lock);
+                cprintf("SWAP OUT pid= %d page = %d for pid = %d\n", victimProcess[i]->pid, victimVA[i] >> PTXSHIFT, pid);
             }
             kfree((char *)P2V(PTE_ADDR(*pte)));
             lcr3(V2P(victimProcess[i]->pgdir));
@@ -196,33 +206,6 @@ int evictVictimPage(int pid)
         }
     }
     return 0;
-}
-
-void swapOut()
-{
-    sleep(&swapOutQueue, &ptable.lock);
-    cprintf("Just entered swapout\n");
-    for (;;)
-    {
-        acquire(&swapOutQueue.lock);
-        while (isEmpty(&swapOutQueue) == 0)
-        {
-            // Dequeue to process request
-            struct proc *requester = getHead(&swapOutQueue);
-            dequeue(&swapOutQueue);
-            cprintf("Process swapout by %d %s\n", requester->pid, requester->name);
-
-            // Select a victim page and evict it
-            evictVictimPage(requester->pid);
-
-            // Set the satisfied field of proc structure to notify process to resume
-            requester->swapSatisfied = 1;
-        }
-        wakeup1(&requestSwapOut);
-        release(&swapOutQueue.lock);
-        sleep(&swapOutQueue, &ptable.lock);
-    }
-    exit();
 }
 
 void getSwapFileName(int pid, uint va, char *name)
@@ -288,8 +271,6 @@ void deleteSwapPages()
                         continue;
                     }
                     release(&ptable.lock);
-                    if (f->ref == 1)
-                        cprintf("Deleting page file: %s\n", f->name);
                     fdelete(p->ofile[fd]->name);
                     fileclose(f);
                     p->ofile[fd] = 0;
@@ -300,6 +281,9 @@ void deleteSwapPages()
         }
     }
 
+    cprintf("\nNumber of Swap Out = %d\nNumber of Swap In = %d\n\n", nSwapOut, nSwapIn);
+    nSwapIn = 0;
+    nSwapOut = 0;
     release(&ptable.lock);
 }
 
@@ -319,5 +303,26 @@ int fwrite(int pid, uint addr, char *buf)
     {
         cprintf("Unable to write page!");
     }
+    return noc;
+}
+
+int fread(int pid, uint addr, char *buf)
+{
+    char name[14];
+
+    getSwapFileName(pid, addr, name);
+    int fd = fopen(name, O_RDONLY); // Open swapout page file
+    struct file *f;
+    if (fd < 0 || fd >= NOFILE || (f = myproc()->ofile[fd]) == 0)
+        return -1;
+    int noc = fileread(f, buf, 4096); // Read the page into the buffer
+    if (noc < 0)
+    {
+        cprintf("Unable to write. Exiting (paging.c::fread)!!");
+    }
+    fdelete(name);
+    fclose(fd);
+    cprintf("SWAP IN pid = %d page = %d\n", pid, addr);
+
     return noc;
 }

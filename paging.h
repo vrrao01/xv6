@@ -14,7 +14,7 @@ extern struct
 } ptable;
 #endif
 
-struct swapRequests swapInQueue, swapOutQueue;
+extern struct swapRequests swapInQueue, swapOutQueue;
 
 void enqueue(struct swapRequests *);
 struct proc *dequeue(struct swapRequests *);
@@ -25,6 +25,7 @@ void requestSwapOut();
 void requestSwapIn();
 void getSwapFileName(int, uint, char *);
 extern int mapSwapIn(pde_t *, void *, uint, uint);
+int evictVictimPage(int);
 void deleteSwapPages();
 int fwrite(int, uint, char *);
 int fread(int, uint, char *);

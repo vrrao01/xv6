@@ -81,14 +81,16 @@ void trap(struct trapframe *tf)
     break;
   case T_PGFLT:
     pte = *getPTE(myproc()->pgdir, (void *)rcr2());
-    cprintf("page fault PID: %d, VA: %x\n", myproc()->pid, rcr2());
+    cprintf("Page Fault PID: %d, VA: %x\n", myproc()->pid, rcr2());
     if (myproc()->pageFaultAddress < myproc()->sz && (pte & ((uint)1 << 7)) != 0)
     {
+      // Request for swap in if SWAPPED OUT bit is set
       myproc()->pageFaultAddress = PGROUNDDOWN(rcr2());
       requestSwapIn();
       break;
     }
     myproc()->killed = 1;
+    break;
   //PAGEBREAK: 13
   default:
     if (myproc() == 0 || (tf->cs & 3) == 0)
