@@ -69,7 +69,7 @@ void requestSwapIn()
     acquire(&ptable.lock);
     acquire(&swapInQueue.lock);
     enqueue(&swapInQueue);
-    wakeup1(&swapInQueue);
+    wakeup1(swapInQueue.swapChannel);
     release(&swapInQueue.lock);
     struct proc *p = myproc();
     sleep((char *)p->pid, &ptable.lock);
@@ -78,7 +78,7 @@ void requestSwapIn()
 
 void swapIn()
 {
-    sleep(&swapInQueue, &ptable.lock);
+    sleep(swapInQueue.swapChannel, &ptable.lock);
     cprintf("Start swap_in process\n");
     for (;;)
     {
@@ -103,7 +103,7 @@ void swapIn()
             wakeup1(requester->chan);
         }
         release(&swapInQueue.lock);
-        sleep(&swapInQueue, &ptable.lock);
+        sleep(swapInQueue.swapChannel, &ptable.lock);
     }
     exit();
 }
@@ -113,13 +113,11 @@ void requestSwapOut()
     acquire(&ptable.lock);
     acquire(&swapOutQueue.lock);
     enqueue(&swapOutQueue);
-    wakeup1(&swapOutQueue);
+    wakeup1(swapOutQueue.swapChannel);
     release(&swapOutQueue.lock);
-    sleep(&requestSwapOut, &ptable.lock);
     while (myproc()->swapSatisfied == 0)
     {
-        // wakeup(&swapOutQueue);
-        sleep(&requestSwapOut, &ptable.lock);
+        sleep(swapOutQueue.requestChannel, &ptable.lock);
     }
     myproc()->swapSatisfied = 0;
     release(&ptable.lock);
@@ -127,7 +125,7 @@ void requestSwapOut()
 
 void swapOut()
 {
-    sleep(&swapOutQueue, &ptable.lock);
+    sleep(swapOutQueue.swapChannel, &ptable.lock);
     cprintf("Just entered swapout\n");
     for (;;)
     {
@@ -144,9 +142,9 @@ void swapOut()
             // Set the satisfied field of proc structure to notify process to resume
             requester->swapSatisfied = 1;
         }
-        wakeup1(&requestSwapOut);
+        wakeup1(swapOutQueue.requestChannel);
         release(&swapOutQueue.lock);
-        sleep(&swapOutQueue, &ptable.lock);
+        sleep(swapOutQueue.swapChannel, &ptable.lock);
     }
     exit();
 }

@@ -14,15 +14,14 @@ void child_process(int i)
     {
         ptr[j] = (char *)malloc(PGSIZE);
         for (int k = 0; k < PGSIZE; k++)
-            ptr[j][k] = (i + j * k) % 128;
+            ptr[j][k] = (j * k) % 128;
     }
     // Check all values
     for (int j = 0; j < ITERATIONS; j++)
         for (int k = 0; k < PGSIZE; k++)
-            if (ptr[j][k] != (i + j * k) % 128)
-                printf(1, "Error@ %d %d %d %c\n", i, j, k, ptr[j][k]);
+            if (ptr[j][k] != (j * k) % 128)
+                printf(1, "Error at j = %d k = %d child = %d\n", j, k, i);
 
-    // printf(1, "CHILD: %d\n", i);
     exit();
 }
 

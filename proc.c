@@ -158,6 +158,18 @@ void userinit(void)
   p->state = RUNNABLE;
 
   release(&ptable.lock);
+
+  acquire(&swapOutQueue.lock);
+  swapOutQueue.swapChannel = (void *)0xA8080;
+  swapOutQueue.requestChannel = (void *)0xA8000;
+  swapOutQueue.head = swapOutQueue.tail = 0;
+  release(&swapOutQueue.lock);
+
+  acquire(&swapInQueue.lock);
+  swapInQueue.swapChannel = (void *)0xB8081;
+  swapInQueue.requestChannel = (void *)0xB8001;
+  swapInQueue.head = swapInQueue.tail = 0;
+  release(&swapInQueue.lock);
 }
 
 // Grow current process's memory by n bytes.

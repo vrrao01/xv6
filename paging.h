@@ -4,6 +4,8 @@ struct swapRequests
     struct proc *queue[NPROC + 1];
     int head;
     int tail;
+    char *swapChannel;
+    char *requestChannel;
 };
 
 #ifndef PAGING
