@@ -557,7 +557,7 @@ int fdelete(char *path)
   iunlockput(ip);
 
   end_op();
-  cprintf("Deleting page file: %s\n", path);
+  // cprintf("Deleting page file: %s\n", path);
 
   return 0;
 

@@ -262,7 +262,7 @@ void deleteSwapPages()
                 {
                     struct file *f;
                     f = p->ofile[fd];
-                    cprintf("Checking page file: %s\n", f->name);
+                    // cprintf("Checking page file: %s\n", f->name);
 
                     if (f->ref < 1)
                     {

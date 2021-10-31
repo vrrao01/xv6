@@ -8,7 +8,6 @@
 void child_process(int i)
 {
     char *ptr[ITERATIONS];
-    i = getpid();
     // Set all values
     for (int j = 0; j < ITERATIONS; j++)
     {
@@ -17,10 +16,12 @@ void child_process(int i)
             ptr[j][k] = (j * k) % 128;
     }
     // Check all values
+    sleep(i % 5);
     for (int j = 0; j < ITERATIONS; j++)
         for (int k = 0; k < PGSIZE; k++)
             if (ptr[j][k] != (j * k) % 128)
             {
+                i = getpid();
                 printf(1, "Error at j = %d k = %d child = %d\n", j, k, i);
                 exit();
             }
