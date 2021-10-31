@@ -126,7 +126,7 @@ void requestSwapOut()
 void swapOut()
 {
     sleep(swapOutQueue.swapChannel, &ptable.lock);
-    cprintf("Just entered swapout\n");
+    cprintf("Start swap_out process\n");
     for (;;)
     {
         acquire(&swapOutQueue.lock);
@@ -160,7 +160,7 @@ int evictVictimPage(int pid)
     for (int process = 0; process < NPROC; process++)
     {
         p = &ptable.proc[process];
-        if (p->state == UNUSED || p->state == EMBRYO || p->state == RUNNING || p->pid < 5 || p->pid == pid)
+        if (!(p->state == RUNNABLE || p->state == ZOMBIE || p->state == SLEEPING) || p->pid < 5 || p->pid == pid)
             continue;
 
         for (uint i = PGSIZE; i < p->sz; i += PGSIZE)
@@ -262,6 +262,7 @@ void deleteSwapPages()
                 {
                     struct file *f;
                     f = p->ofile[fd];
+                    cprintf("Checking page file: %s\n", f->name);
 
                     if (f->ref < 1)
                     {
@@ -269,6 +270,8 @@ void deleteSwapPages()
                         continue;
                     }
                     release(&ptable.lock);
+                    // if (f->ref == 1)
+                    //     cprintf("Deleting page file: %s\n", f->name);
                     fdelete(p->ofile[fd]->name);
                     fileclose(f);
                     p->ofile[fd] = 0;

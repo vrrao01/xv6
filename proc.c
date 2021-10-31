@@ -604,5 +604,6 @@ void create_kernel_process(const char *name, void (*entrypoint)())
   acquire(&ptable.lock);
   np->state = RUNNABLE;
   release(&ptable.lock);
+  cprintf("Created kernel process %s with pid = %d\n", name, np->pid);
   return;
 }

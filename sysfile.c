@@ -492,7 +492,9 @@ int fopen(char *path, int omode)
   if ((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0)
   {
     if (f)
+    {
       fileclose(f);
+    }
     iunlockput(ip);
     end_op();
     return -1;
@@ -555,6 +557,7 @@ int fdelete(char *path)
   iunlockput(ip);
 
   end_op();
+  cprintf("Deleting page file: %s\n", path);
 
   return 0;
 
