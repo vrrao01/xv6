@@ -13,7 +13,6 @@ struct gatedesc idt[256];
 extern uint vectors[]; // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
-extern int updateTimeUsed(void);
 
 void tvinit(void)
 {
@@ -34,7 +33,6 @@ void idtinit(void)
 //PAGEBREAK: 41
 void trap(struct trapframe *tf)
 {
-  // cprintf("%d In trap with\n ",ticks);
   if (tf->trapno == T_SYSCALL)
   {
     if (myproc()->killed)
@@ -53,8 +51,6 @@ void trap(struct trapframe *tf)
     {
       acquire(&tickslock);
       ticks++;
-      updateStats();
-      updateTimeUsed();
       wakeup(&ticks);
       release(&tickslock);
     }
@@ -82,7 +78,7 @@ void trap(struct trapframe *tf)
     lapiceoi();
     break;
 
-    //PAGEBREAK: 13
+  //PAGEBREAK: 13
   default:
     if (tf->trapno == T_PGFLT)
     {
@@ -108,28 +104,19 @@ void trap(struct trapframe *tf)
     myproc()->killed = 1;
   }
 
-#if defined DEFAULT || defined SML
-  // If the time for which current process held the CPU ==  QUANTA, yield()
-  int timeUsed = myproc() == 0 ? -1 : myproc()->timeUsed;
-  if (myproc() && myproc()->state == RUNNING && timeUsed == QUANTA)
+  // Force process exit if it has been killed and is in user space.
+  // (If it is still executing in the kernel, let it keep running
+  // until it gets to the regular system call return.)
+  if (myproc() && myproc()->killed && (tf->cs & 3) == DPL_USER)
+    exit();
+
+  // Force process to give up CPU on clock tick.
+  // If interrupts were on while locks held, would need to check nlock.
+  if (myproc() && myproc()->state == RUNNING &&
+      tf->trapno == T_IRQ0 + IRQ_TIMER)
     yield();
-#else
-#ifdef DML
-  // If the time for which current process held the CPU ==  QUANTA, yield()
-  int timeUsed = myproc() == 0 ? -1 : myproc()->timeUsed;
-  if (myproc() && myproc()->state == RUNNING && timeUsed == QUANTA)
-  {
-    // Reduce priority by 1 if complete time quanta is used
-    myproc()->priority = myproc()->priority == 1 ? 1 : myproc()->priority - 1;
-    yield();
-  }
-#else
-#ifdef FCFS
-  // Do not preempt the process and hence don't call yield()
-#endif
-#endif
-#endif
-  // If current process was killed since we last yielded, it should exit()
+
+  // Check if the process has been killed since we yielded
   if (myproc() && myproc()->killed && (tf->cs & 3) == DPL_USER)
     exit();
 }

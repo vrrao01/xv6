@@ -23,36 +23,6 @@ int sys_wait(void)
   return wait();
 }
 
-int sys_wait2(void)
-{
-  int *stime;
-  int *retime;
-  int *rutime;
-  if (argptr(0, (void *)&retime, sizeof(retime)) < 0)
-    return -1;
-  if (argptr(1, (void *)&rutime, sizeof(rutime)) < 0)
-    return -1;
-  if (argptr(2, (void *)&stime, sizeof(stime)) < 0)
-    return -1;
-  return wait2(retime, rutime, stime);
-}
-
-int sys_set_prio(void)
-{
-  int priority;
-  if (argint(0, &priority) < 0)
-    return 1;
-  return set_prio(priority);
-}
-
-int sys_yield(void)
-{
-  yield();
-  // yield() doesn't fail unless ptable lock can't be acquired.
-  // This case is taken care of by XV6 panic
-  return 0;
-}
-
 int sys_kill(void)
 {
   int pid;
@@ -113,13 +83,4 @@ int sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
-}
-
-int sys_history(void)
-{
-  char *buffer;
-  int historyId;
-  argint(1, &historyId);
-  argptr(0, &buffer, 128);
-  return history(buffer, historyId);
 }
