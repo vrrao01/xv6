@@ -21,7 +21,6 @@ void            consoleinit(void);
 void            cprintf(char*, ...);
 void            consoleintr(int(*)(void));
 void            panic(char*) __attribute__((noreturn));
-int             history(char*,int);
 
 // exec.c
 int             exec(char*, char**);
@@ -119,10 +118,8 @@ void            setproc(struct proc*);
 void            sleep(void*, struct spinlock*);
 void            userinit(void);
 int             wait(void);
-int             wait2(int*, int*, int*);
 void            wakeup(void*);
 void            yield(void);
-int             set_prio(int);
 
 // swtch.S
 void            swtch(struct context**, struct context*);
