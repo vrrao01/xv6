@@ -1,0 +1,1251 @@
+diff -uN xv6-public/console.c os-lab/console.c
+--- xv6-public/console.c	2021-09-15 18:10:18.256322151 +0530
++++ os-lab/console.c	2021-09-15 10:40:35.423939204 +0530
+@@ -19,7 +19,8 @@
+ 
+ static int panicked = 0;
+ 
+-static struct {
++static struct
++{
+   struct spinlock lock;
+   int locking;
+ } cons;
+@@ -32,49 +33,52 @@
+   int i;
+   uint x;
+ 
+-  if(sign && (sign = xx < 0))
++  if (sign && (sign = xx < 0))
+     x = -xx;
+   else
+     x = xx;
+ 
+   i = 0;
+-  do{
++  do
++  {
+     buf[i++] = digits[x % base];
+-  }while((x /= base) != 0);
++  } while ((x /= base) != 0);
+ 
+-  if(sign)
++  if (sign)
+     buf[i++] = '-';
+ 
+-  while(--i >= 0)
++  while (--i >= 0)
+     consputc(buf[i]);
+ }
+ //PAGEBREAK: 50
+ 
+ // Print to the console. only understands %d, %x, %p, %s.
+-void
+-cprintf(char *fmt, ...)
++void cprintf(char *fmt, ...)
+ {
+   int i, c, locking;
+   uint *argp;
+   char *s;
+ 
+   locking = cons.locking;
+-  if(locking)
++  if (locking)
+     acquire(&cons.lock);
+ 
+   if (fmt == 0)
+     panic("null fmt");
+ 
+-  argp = (uint*)(void*)(&fmt + 1);
+-  for(i = 0; (c = fmt[i] & 0xff) != 0; i++){
+-    if(c != '%'){
++  argp = (uint *)(void *)(&fmt + 1);
++  for (i = 0; (c = fmt[i] & 0xff) != 0; i++)
++  {
++    if (c != '%')
++    {
+       consputc(c);
+       continue;
+     }
+     c = fmt[++i] & 0xff;
+-    if(c == 0)
++    if (c == 0)
+       break;
+-    switch(c){
++    switch (c)
++    {
+     case 'd':
+       printint(*argp++, 10, 1);
+       break;
+@@ -83,9 +87,9 @@
+       printint(*argp++, 16, 0);
+       break;
+     case 's':
+-      if((s = (char*)*argp++) == 0)
++      if ((s = (char *)*argp++) == 0)
+         s = "(null)";
+-      for(; *s; s++)
++      for (; *s; s++)
+         consputc(*s);
+       break;
+     case '%':
+@@ -99,12 +103,11 @@
+     }
+   }
+ 
+-  if(locking)
++  if (locking)
+     release(&cons.lock);
+ }
+ 
+-void
+-panic(char *s)
++void panic(char *s)
+ {
+   int i;
+   uint pcs[10];
+@@ -116,18 +119,22 @@
+   cprintf(s);
+   cprintf("\n");
+   getcallerpcs(&s, pcs);
+-  for(i=0; i<10; i++)
++  for (i = 0; i < 10; i++)
+     cprintf(" %p", pcs[i]);
+   panicked = 1; // freeze other CPU
+-  for(;;)
++  for (;;)
+     ;
+ }
+ 
+ //PAGEBREAK: 50
+ #define BACKSPACE 0x100
++#define LEFT_ARROW 228
++#define RIGHT_ARROW 229
++#define UP_ARROW 226
++#define DOWN_ARROW 227
+ #define CRTPORT 0x3d4
+-static ushort *crt = (ushort*)P2V(0xb8000);  // CGA memory
+-
++static ushort *crt = (ushort *)P2V(0xb8000); // CGA memory
++int max_pos = 0;                             // Position of rightmost character
+ static void
+ cgaputc(int c)
+ {
+@@ -135,91 +142,388 @@
+ 
+   // Cursor position: col + 80*row.
+   outb(CRTPORT, 14);
+-  pos = inb(CRTPORT+1) << 8;
++  pos = inb(CRTPORT + 1) << 8;
+   outb(CRTPORT, 15);
+-  pos |= inb(CRTPORT+1);
++  pos |= inb(CRTPORT + 1);
+ 
+-  if(c == '\n')
+-    pos += 80 - pos%80;
+-  else if(c == BACKSPACE){
+-    if(pos > 0) --pos;
+-  } else
+-    crt[pos++] = (c&0xff) | 0x0700;  // black on white
++  if (c == '\n')
++    pos += 80 - pos % 80;
++  else if (c == BACKSPACE)
++  {
++    /*
++    Ensure the cursor is not at the leftmost position and
++    appropriate shift the characters to the left. 
++    */
++    if (pos > 0)
++    {
++      --pos;
++      for (int t = pos; t < max_pos; t++)
++        crt[t] = ((crt[t + 1] & 0xff) | 0x0700);
++      crt[max_pos] = ' ' | 0x0700;
++      --max_pos;
++    }
++  }
+ 
+-  if(pos < 0 || pos > 25*80)
++  else if (c == LEFT_ARROW)
++  {
++    --pos; // Move cursor to the left
++  }
++  else if (c == RIGHT_ARROW)
++  {
++    ++pos; // Move cursor to the right
++  }
++  else
++  {
++    /* 
++    Print entered character onto the screen. 
++    Also, shift right in case entered character is in the middle.
++    */
++    for (int t = max_pos; t >= pos; t--)
++      crt[t + 1] = ((crt[t] & 0xff) | 0x0700);
++    max_pos++;
++    if (pos > max_pos)
++      max_pos = pos;
++    crt[pos++] = (c & 0xff) | 0x0700; // black on white
++  }
++
++  if (pos < 0 || pos > 25 * 80)
+     panic("pos under/overflow");
+ 
+-  if((pos/80) >= 24){  // Scroll up.
+-    memmove(crt, crt+80, sizeof(crt[0])*23*80);
++  if ((pos / 80) >= 24)
++  { // Scroll up.
++    memmove(crt, crt + 80, sizeof(crt[0]) * 23 * 80);
+     pos -= 80;
+-    memset(crt+pos, 0, sizeof(crt[0])*(24*80 - pos));
++    memset(crt + pos, 0, sizeof(crt[0]) * (24 * 80 - pos));
+   }
+ 
+   outb(CRTPORT, 14);
+-  outb(CRTPORT+1, pos>>8);
++  outb(CRTPORT + 1, pos >> 8);
+   outb(CRTPORT, 15);
+-  outb(CRTPORT+1, pos);
+-  crt[pos] = ' ' | 0x0700;
++  outb(CRTPORT + 1, pos);
+ }
+ 
+-void
+-consputc(int c)
++#define INPUT_BUF 128
++#define MAX_HISTORY 16
++struct
+ {
+-  if(panicked){
++  char buf[INPUT_BUF];
++  uint r; // Read index
++  uint w; // Write index
++  uint e; // Edit index
++  uint m; // Rightmost character index
++} input;
++
++/*
++Shell history ring structure
++*/
++struct
++{
++  char buffer[MAX_HISTORY][INPUT_BUF]; // 2D array to store commands
++  int head;                            // Head of the queue
++  int tail;                            // Tail of the queue
++  int currentIndex;                    // Index of current command from history being viewed
++  char partialBuffer[INPUT_BUF];       // Buffer to store command typed before accessing history
++} historyRing;
++
++void consputc(int c)
++{
++  if (panicked)
++  {
+     cli();
+-    for(;;)
++    for (;;)
+       ;
+   }
+ 
+-  if(c == BACKSPACE){
+-    uartputc('\b'); uartputc(' '); uartputc('\b');
+-  } else
+-    uartputc(c);
++  if (c == RIGHT_ARROW)
++  {
++    uartputc(input.buf[input.e]);
++    cgaputc(c);
++    return;
++  }
++
++  if (c == LEFT_ARROW)
++  {
++    uartputc('\b');
++    cgaputc(c);
++    return;
++  }
++  if (c == BACKSPACE)
++  {
++    uartputc('\b');
++    /*
++    Shift all characters to the right of cursor, one position to the left.
++    */
++    for (uint t = input.e; t < input.m; t++)
++    {
++      uartputc(input.buf[t + 1]);
++      input.buf[t] = input.buf[t + 1];
++    }
++    uartputc(' ');
++    uartputc('\b');
++    /*
++    Move serial port cursor to correct edit position.
++    */
++    for (uint t = input.e; t < input.m; t++)
++    {
++      uartputc('\b');
++    }
++  }
++  else
++  {
++    if (input.e < input.m)
++    {
++      char fill, temp;
++      fill = c;
++      for (int i = input.e; i <= input.m; i++)
++      {
++        temp = input.buf[i % INPUT_BUF];
++        uartputc(fill);
++        fill = temp;
++      }
++      for (int i = input.e; i < input.m; i++)
++      {
++        uartputc('\b');
++      }
++    }
++    else
++    {
++      uartputc(c);
++    }
++  }
++
+   cgaputc(c);
+ }
+ 
+-#define INPUT_BUF 128
+-struct {
+-  char buf[INPUT_BUF];
+-  uint r;  // Read index
+-  uint w;  // Write index
+-  uint e;  // Edit index
+-} input;
++/*
++Removes the line of text currently display on the console.
++*/
++void clearConsoleLine()
++{
++  for (int i = input.e; i < input.m; i++)
++  {
++    consputc(RIGHT_ARROW); // Moves cursor to rightmost position
++  }
++  for (int i = input.r; i < input.m; i++)
++  {
++    uartputc('\b');
++    uartputc(' ');
++    uartputc('\b');
++    cgaputc(BACKSPACE);
++    // consputc(BACKSPACE); // Clears text by repeated BACKSPACEs
++  }
++}
+ 
+-#define C(x)  ((x)-'@')  // Control-x
++/*
++Resets input buffer in order to fill command from history 
++*/
++void clearInputBufferLine()
++{
++  input.m = input.r;
++  input.e = input.r;
++}
+ 
+-void
+-consoleintr(int (*getc)(void))
++/*
++Copy command at index history.currentIndex into the input buffer
++*/
++void copyHistorytoInputBuffer()
+ {
+-  int c, doprocdump = 0;
++  for (int i = 0; i < INPUT_BUF; i++)
++  {
++    if (historyRing.buffer[historyRing.currentIndex][i] == 0)
++      break;
++    input.buf[(input.r + i) % INPUT_BUF] = historyRing.buffer[historyRing.currentIndex][i];
++    input.e++;
++    input.m++;
++  }
++}
+ 
++/*
++Copies the command entered before pressing on up arrow into a temporary buffer
++*/
++void savePartialCommand()
++{
++  memset(historyRing.partialBuffer, 0, INPUT_BUF);
++  for (int i = input.r; i < input.m; i++)
++  {
++    historyRing.partialBuffer[i - input.r] = input.buf[i % INPUT_BUF];
++  }
++}
++
++/*
++Copies the command typed before accessing history back into input buffer
++*/
++void copyPartialToInputBuffer()
++{
++  for (int i = 0; i < INPUT_BUF; i++)
++  {
++    if (historyRing.partialBuffer[i] == 0)
++      break;
++    input.buf[(input.r + i) % INPUT_BUF] = historyRing.partialBuffer[i];
++    input.e++;
++    input.m++;
++  }
++}
++
++/*
++Stores the entered command into the history shell ring.
++*/
++void saveHistory()
++{
++  if (historyRing.buffer[historyRing.head][0] == 0)
++  {
++    int length = input.m - input.r;
++    for (int i = 0; i < length; i++)
++    {
++      historyRing.buffer[historyRing.tail][i] = input.buf[(input.r + i) % INPUT_BUF];
++    }
++  }
++  else
++  {
++    historyRing.tail = (historyRing.tail + 1) % MAX_HISTORY;
++    if (historyRing.tail == historyRing.head)
++      historyRing.head = (historyRing.head + 1) % MAX_HISTORY;
++    int length = input.m - input.r;
++    memset(historyRing.buffer[historyRing.tail], 0, INPUT_BUF);
++    for (int i = 0; i < length; i++)
++    {
++      historyRing.buffer[historyRing.tail][i] = input.buf[(input.r + i) % INPUT_BUF];
++    }
++  }
++  historyRing.currentIndex = -1;
++}
++
++/*
++Function used by sys_history system call to copy command at index = historyID into buffer
++*/
++int history(char *buffer, int historyID)
++{
++  if (historyID < 0 || historyID > 15)
++    return 2;
++  int index = (historyRing.head + historyID) % MAX_HISTORY;
++  if (historyRing.buffer[index][0] == 0)
++    return 1;
++  memmove(buffer, historyRing.buffer[index], INPUT_BUF);
++  return 0;
++}
++#define C(x) ((x) - '@') // Control-x
++
++void consoleintr(int (*getc)(void))
++{
++  int c, doprocdump = 0;
++  // uint tempIndex;
+   acquire(&cons.lock);
+-  while((c = getc()) >= 0){
+-    switch(c){
+-    case C('P'):  // Process listing.
++  while ((c = getc()) >= 0)
++  {
++    if (input.m < input.e)
++      input.m = input.e;
++    switch (c)
++    {
++    case C('P'): // Process listing.
+       // procdump() locks cons.lock indirectly; invoke later
+       doprocdump = 1;
+       break;
+-    case C('U'):  // Kill line.
+-      while(input.e != input.w &&
+-            input.buf[(input.e-1) % INPUT_BUF] != '\n'){
++    case C('U'): // Kill line.
++      while (input.e != input.w &&
++             input.buf[(input.e - 1) % INPUT_BUF] != '\n')
++      {
+         input.e--;
+         consputc(BACKSPACE);
+       }
+       break;
+-    case C('H'): case '\x7f':  // Backspace
+-      if(input.e != input.w){
++    case C('H'):
++    case '\x7f': // Backspace
++      if (input.e != input.w)
++      {
++        input.m--;
+         input.e--;
+         consputc(BACKSPACE);
+       }
+       break;
++    case LEFT_ARROW:
++      if (input.e != input.w)
++      {
++        input.e--;
++        consputc(c);
++      }
++      break;
++
++    case RIGHT_ARROW:
++      if (input.e != input.m)
++      {
++        consputc(c);
++        input.e++;
++      }
++      break;
++
++    case UP_ARROW:
++      if (historyRing.buffer[historyRing.head][0] != 0)
++      {
++        clearConsoleLine();
++        if (historyRing.currentIndex == -1)
++        {
++          historyRing.currentIndex = historyRing.tail;
++          savePartialCommand();
++        }
++        else if (historyRing.currentIndex != historyRing.head)
++          historyRing.currentIndex = (historyRing.currentIndex + MAX_HISTORY - 1) % MAX_HISTORY;
++        clearInputBufferLine();
++        release(&cons.lock); // Release console lock so that cprint can aquire lock
++        cprintf(historyRing.buffer[historyRing.currentIndex]);
++        acquire(&cons.lock);
++        copyHistorytoInputBuffer();
++      }
++      break;
++    case DOWN_ARROW:
++      if (historyRing.buffer[historyRing.head][0] != 0)
++      {
++        if (historyRing.currentIndex == historyRing.tail)
++        {
++          historyRing.currentIndex = -1;
++          clearConsoleLine();
++          clearInputBufferLine();
++          release(&cons.lock);
++          cprintf(historyRing.partialBuffer);
++          acquire(&cons.lock);
++          copyPartialToInputBuffer();
++        }
++        else if (historyRing.currentIndex != -1)
++        {
++          historyRing.currentIndex = (historyRing.currentIndex + 1) % MAX_HISTORY;
++          clearConsoleLine();
++          clearInputBufferLine();
++          copyHistorytoInputBuffer();
++          release(&cons.lock);
++          cprintf(historyRing.buffer[historyRing.currentIndex]);
++          acquire(&cons.lock);
++        }
++      }
++      break;
+     default:
+-      if(c != 0 && input.e-input.r < INPUT_BUF){
++      if (c != 0 && input.e - input.r < INPUT_BUF)
++      {
+         c = (c == '\r') ? '\n' : c;
++        if (c == '\n' || c == C('D') || input.e == input.r + INPUT_BUF)
++        {
++          input.e = input.m; // Move edit index to rightmost index to execute command
++        }
++        if (input.e < input.m)
++        {
++          /*
++          Shift right input buffer  in case character is not added at rightmost position.
++          */
++          int n = input.m - input.e;
++          for (int i = n; i > 0; i--)
++          {
++            input.buf[(input.e + i) % INPUT_BUF] = input.buf[(input.e + i - 1) % INPUT_BUF];
++          }
++          input.m++;
++        }
+         input.buf[input.e++ % INPUT_BUF] = c;
+         consputc(c);
+-        if(c == '\n' || c == C('D') || input.e == input.r+INPUT_BUF){
++        if (c == '\n' || c == C('D') || input.e == input.r + INPUT_BUF)
++        {
+           input.w = input.e;
++          saveHistory();
+           wakeup(&input.r);
+         }
+       }
+@@ -227,13 +531,13 @@
+     }
+   }
+   release(&cons.lock);
+-  if(doprocdump) {
+-    procdump();  // now call procdump() wo. cons.lock held
++  if (doprocdump)
++  {
++    procdump(); // now call procdump() wo. cons.lock held
+   }
+ }
+ 
+-int
+-consoleread(struct inode *ip, char *dst, int n)
++int consoleread(struct inode *ip, char *dst, int n)
+ {
+   uint target;
+   int c;
+@@ -241,9 +545,12 @@
+   iunlock(ip);
+   target = n;
+   acquire(&cons.lock);
+-  while(n > 0){
+-    while(input.r == input.w){
+-      if(myproc()->killed){
++  while (n > 0)
++  {
++    while (input.r == input.w)
++    {
++      if (myproc()->killed)
++      {
+         release(&cons.lock);
+         ilock(ip);
+         return -1;
+@@ -251,8 +558,10 @@
+       sleep(&input.r, &cons.lock);
+     }
+     c = input.buf[input.r++ % INPUT_BUF];
+-    if(c == C('D')){  // EOF
+-      if(n < target){
++    if (c == C('D'))
++    { // EOF
++      if (n < target)
++      {
+         // Save ^D for next time, to make sure
+         // caller gets a 0-byte result.
+         input.r--;
+@@ -261,7 +570,7 @@
+     }
+     *dst++ = c;
+     --n;
+-    if(c == '\n')
++    if (c == '\n')
+       break;
+   }
+   release(&cons.lock);
+@@ -270,14 +579,13 @@
+   return target - n;
+ }
+ 
+-int
+-consolewrite(struct inode *ip, char *buf, int n)
++int consolewrite(struct inode *ip, char *buf, int n)
+ {
+   int i;
+ 
+   iunlock(ip);
+   acquire(&cons.lock);
+-  for(i = 0; i < n; i++)
++  for (i = 0; i < n; i++)
+     consputc(buf[i] & 0xff);
+   release(&cons.lock);
+   ilock(ip);
+@@ -285,8 +593,7 @@
+   return n;
+ }
+ 
+-void
+-consoleinit(void)
++void consoleinit(void)
+ {
+   initlock(&cons.lock, "console");
+ 
+@@ -295,5 +602,4 @@
+   cons.locking = 1;
+ 
+   ioapicenable(IRQ_KBD, 0);
+-}
+-
++}
+\ No newline at end of file
+diff -uN xv6-public/defs.h os-lab/defs.h
+--- xv6-public/defs.h	2021-09-15 18:10:18.256322151 +0530
++++ os-lab/defs.h	2021-09-13 19:24:56.359306414 +0530
+@@ -21,6 +21,7 @@
+ void            cprintf(char*, ...);
+ void            consoleintr(int(*)(void));
+ void            panic(char*) __attribute__((noreturn));
++int             history(char*,int);
+ 
+ // exec.c
+ int             exec(char*, char**);
+@@ -118,6 +119,7 @@
+ void            sleep(void*, struct spinlock*);
+ void            userinit(void);
+ int             wait(void);
++int             wait2(int*, int*, int*);
+ void            wakeup(void*);
+ void            yield(void);
+ 
+Common subdirectories: xv6-public/.git and os-lab/.git
+diff -uN xv6-public/.gitignore os-lab/.gitignore
+--- xv6-public/.gitignore	2021-09-15 18:10:18.256322151 +0530
++++ os-lab/.gitignore	2021-09-13 18:50:19.302611899 +0530
+@@ -14,3 +14,4 @@
+ kernelmemfs
+ mkfs
+ .gdbinit
++.vscode
+\ No newline at end of file
+diff -uN xv6-public/history.c os-lab/history.c
+--- xv6-public/history.c	1970-01-01 05:30:00.000000000 +0530
++++ os-lab/history.c	2021-09-13 18:50:19.302611899 +0530
+@@ -0,0 +1,23 @@
++#include "types.h"
++#include "user.h"
++
++int main(int argc, char *argv[])
++{
++    char buffer[128];
++    int hasHistory;
++    for (int i = 0; i < 16; i++)
++    {
++        memset(buffer, 0, 128);
++        if (history(buffer, i) != 0)
++        {
++            break;
++        }
++        hasHistory = 1;
++        printf(1, "%d : %s\n", i, buffer);
++    }
++    if (hasHistory == 0)
++    {
++        printf(1, "No history available \n");
++    }
++    exit();
++}
+diff -uN xv6-public/Makefile os-lab/Makefile
+--- xv6-public/Makefile	2021-09-15 18:10:18.256322151 +0530
++++ os-lab/Makefile	2021-09-13 19:24:56.359306414 +0530
+@@ -181,6 +181,8 @@
+ 	_usertests\
+ 	_wc\
+ 	_zombie\
++	_history\
++	_wait2\
+ 
+ fs.img: mkfs README $(UPROGS)
+ 	./mkfs fs.img README $(UPROGS)
+diff -uN xv6-public/proc.c os-lab/proc.c
+--- xv6-public/proc.c	2021-09-15 18:10:18.256322151 +0530
++++ os-lab/proc.c	2021-09-13 19:24:56.447306650 +0530
+@@ -88,6 +88,10 @@
+ found:
+   p->state = EMBRYO;
+   p->pid = nextpid++;
++  p->ctime = ticks;
++  p->retime = 0;
++  p->rutime = 0;
++  p->stime = 0;
+ 
+   release(&ptable.lock);
+ 
+@@ -311,6 +315,56 @@
+   }
+ }
+ 
++int
++wait2(int *retime, int *rutime, int *stime)
++{
++  struct proc *p;
++  int havekids, pid;
++  struct proc *curproc = myproc();
++  acquire(&ptable.lock);
++  for(;;){
++    // Scan through table looking for exited children.
++    havekids = 0;
++    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
++      if(p->parent != curproc)
++        continue;
++      havekids = 1;
++      if(p->state == ZOMBIE){
++        //updating retime,rutime,stime of this child process
++        *retime = p->retime;
++        *rutime = p->rutime;
++        *stime = p->stime;
++
++        // Found one.
++        pid = p->pid;
++        kfree(p->kstack);
++        p->kstack = 0;
++        freevm(p->pgdir);
++        p->pid = 0;
++        p->parent = 0;
++        p->name[0] = 0;
++        p->killed = 0;
++        p->state = UNUSED;
++        p->retime=0;
++        p->rutime=0;
++        p->ctime=0;
++        p->stime=0;
++        release(&ptable.lock);
++        return pid;
++      }
++    }
++
++    // No point waiting if we don't have any children.
++    if(!havekids || curproc->killed){
++      release(&ptable.lock);
++      return -1;
++    }
++
++    // Wait for children to exit.  (See wakeup1 call in proc_exit.)
++    sleep(curproc, &ptable.lock);  //DOC: wait-sleep
++  }
++}
++
+ //PAGEBREAK: 42
+ // Per-CPU process scheduler.
+ // Each CPU calls scheduler() after setting itself up.
+@@ -342,7 +396,7 @@
+       c->proc = p;
+       switchuvm(p);
+       p->state = RUNNING;
+-
++      p->rutime++;
+       swtch(&(c->scheduler), p->context);
+       switchkvm();
+ 
+@@ -532,3 +586,28 @@
+     cprintf("\n");
+   }
+ }
++
++void
++updateStats()
++{
++  struct proc *p;
++  acquire(&ptable.lock);
++  p = ptable.proc;
++  while(p<&ptable.proc[NPROC])
++  {
++    if(p->state == SLEEPING)
++    {
++      p->stime++;
++    }
++    else if(p->state == RUNNABLE)
++    {
++      p->retime++;
++    }
++    else if(p->state == RUNNING)
++    {
++      p->rutime++;
++    }
++    p++;
++  }
++  release(&ptable.lock);
++}
+diff -uN xv6-public/proc.h os-lab/proc.h
+--- xv6-public/proc.h	2021-09-15 18:10:18.256322151 +0530
++++ os-lab/proc.h	2021-09-13 19:24:56.459306681 +0530
+@@ -49,6 +49,10 @@
+   struct file *ofile[NOFILE];  // Open files
+   struct inode *cwd;           // Current directory
+   char name[16];               // Process name (debugging)
++  int ctime;                   // Creation time
++  int stime;                   // Time spent in sleeping state
++  int retime;                  // Time spent in ready state
++  int rutime;                  // Time spent in running state
+ };
+ 
+ // Process memory is laid out contiguously, low addresses first:
+@@ -56,3 +60,5 @@
+ //   original data and bss
+ //   fixed-size stack
+ //   expandable heap
++
++void updateStats();
+diff -uN xv6-public/syscall.c os-lab/syscall.c
+--- xv6-public/syscall.c	2021-09-15 18:10:18.256322151 +0530
++++ os-lab/syscall.c	2021-09-13 19:24:56.459306681 +0530
+@@ -14,58 +14,55 @@
+ // to a saved program counter, and then the first argument.
+ 
+ // Fetch the int at addr from the current process.
+-int
+-fetchint(uint addr, int *ip)
++int fetchint(uint addr, int *ip)
+ {
+   struct proc *curproc = myproc();
+ 
+-  if(addr >= curproc->sz || addr+4 > curproc->sz)
++  if (addr >= curproc->sz || addr + 4 > curproc->sz)
+     return -1;
+-  *ip = *(int*)(addr);
++  *ip = *(int *)(addr);
+   return 0;
+ }
+ 
+ // Fetch the nul-terminated string at addr from the current process.
+ // Doesn't actually copy the string - just sets *pp to point at it.
+ // Returns length of string, not including nul.
+-int
+-fetchstr(uint addr, char **pp)
++int fetchstr(uint addr, char **pp)
+ {
+   char *s, *ep;
+   struct proc *curproc = myproc();
+ 
+-  if(addr >= curproc->sz)
++  if (addr >= curproc->sz)
+     return -1;
+-  *pp = (char*)addr;
+-  ep = (char*)curproc->sz;
+-  for(s = *pp; s < ep; s++){
+-    if(*s == 0)
++  *pp = (char *)addr;
++  ep = (char *)curproc->sz;
++  for (s = *pp; s < ep; s++)
++  {
++    if (*s == 0)
+       return s - *pp;
+   }
+   return -1;
+ }
+ 
+ // Fetch the nth 32-bit system call argument.
+-int
+-argint(int n, int *ip)
++int argint(int n, int *ip)
+ {
+-  return fetchint((myproc()->tf->esp) + 4 + 4*n, ip);
++  return fetchint((myproc()->tf->esp) + 4 + 4 * n, ip);
+ }
+ 
+ // Fetch the nth word-sized system call argument as a pointer
+ // to a block of memory of size bytes.  Check that the pointer
+ // lies within the process address space.
+-int
+-argptr(int n, char **pp, int size)
++int argptr(int n, char **pp, int size)
+ {
+   int i;
+   struct proc *curproc = myproc();
+- 
+-  if(argint(n, &i) < 0)
++
++  if (argint(n, &i) < 0)
+     return -1;
+-  if(size < 0 || (uint)i >= curproc->sz || (uint)i+size > curproc->sz)
++  if (size < 0 || (uint)i >= curproc->sz || (uint)i + size > curproc->sz)
+     return -1;
+-  *pp = (char*)i;
++  *pp = (char *)i;
+   return 0;
+ }
+ 
+@@ -73,11 +70,10 @@
+ // Check that the pointer is valid and the string is nul-terminated.
+ // (There is no shared writable memory, so the string can't change
+ // between this check and being used by the kernel.)
+-int
+-argstr(int n, char **pp)
++int argstr(int n, char **pp)
+ {
+   int addr;
+-  if(argint(n, &addr) < 0)
++  if (argint(n, &addr) < 0)
+     return -1;
+   return fetchstr(addr, pp);
+ }
+@@ -103,41 +99,47 @@
+ extern int sys_wait(void);
+ extern int sys_write(void);
+ extern int sys_uptime(void);
++extern int sys_history(void);
++extern int sys_wait2(void);
+ 
+ static int (*syscalls[])(void) = {
+-[SYS_fork]    sys_fork,
+-[SYS_exit]    sys_exit,
+-[SYS_wait]    sys_wait,
+-[SYS_pipe]    sys_pipe,
+-[SYS_read]    sys_read,
+-[SYS_kill]    sys_kill,
+-[SYS_exec]    sys_exec,
+-[SYS_fstat]   sys_fstat,
+-[SYS_chdir]   sys_chdir,
+-[SYS_dup]     sys_dup,
+-[SYS_getpid]  sys_getpid,
+-[SYS_sbrk]    sys_sbrk,
+-[SYS_sleep]   sys_sleep,
+-[SYS_uptime]  sys_uptime,
+-[SYS_open]    sys_open,
+-[SYS_write]   sys_write,
+-[SYS_mknod]   sys_mknod,
+-[SYS_unlink]  sys_unlink,
+-[SYS_link]    sys_link,
+-[SYS_mkdir]   sys_mkdir,
+-[SYS_close]   sys_close,
++    [SYS_fork] sys_fork,
++    [SYS_exit] sys_exit,
++    [SYS_wait] sys_wait,
++    [SYS_pipe] sys_pipe,
++    [SYS_read] sys_read,
++    [SYS_kill] sys_kill,
++    [SYS_exec] sys_exec,
++    [SYS_fstat] sys_fstat,
++    [SYS_chdir] sys_chdir,
++    [SYS_dup] sys_dup,
++    [SYS_getpid] sys_getpid,
++    [SYS_sbrk] sys_sbrk,
++    [SYS_sleep] sys_sleep,
++    [SYS_uptime] sys_uptime,
++    [SYS_open] sys_open,
++    [SYS_write] sys_write,
++    [SYS_mknod] sys_mknod,
++    [SYS_unlink] sys_unlink,
++    [SYS_link] sys_link,
++    [SYS_mkdir] sys_mkdir,
++    [SYS_close] sys_close,
++    [SYS_history] sys_history,
++    [SYS_wait2]   sys_wait2,
+ };
+ 
+-void
+-syscall(void)
++void syscall(void)
+ {
+   int num;
+   struct proc *curproc = myproc();
+ 
+   num = curproc->tf->eax;
+-  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
++  if (num > 0 && num < NELEM(syscalls) && syscalls[num])
++  {
+     curproc->tf->eax = syscalls[num]();
+-  } else {
++  }
++  else
++  {
+     cprintf("%d %s: unknown sys call %d\n",
+             curproc->pid, curproc->name, num);
+     curproc->tf->eax = -1;
+diff -uN xv6-public/syscall.h os-lab/syscall.h
+--- xv6-public/syscall.h	2021-09-15 18:10:18.260321100 +0530
++++ os-lab/syscall.h	2021-09-13 19:24:56.459306681 +0530
+@@ -1,22 +1,25 @@
+ // System call numbers
+-#define SYS_fork    1
+-#define SYS_exit    2
+-#define SYS_wait    3
+-#define SYS_pipe    4
+-#define SYS_read    5
+-#define SYS_kill    6
+-#define SYS_exec    7
+-#define SYS_fstat   8
+-#define SYS_chdir   9
+-#define SYS_dup    10
++#define SYS_fork 1
++#define SYS_exit 2
++#define SYS_wait 3
++#define SYS_pipe 4
++#define SYS_read 5
++#define SYS_kill 6
++#define SYS_exec 7
++#define SYS_fstat 8
++#define SYS_chdir 9
++#define SYS_dup 10
+ #define SYS_getpid 11
+-#define SYS_sbrk   12
+-#define SYS_sleep  13
++#define SYS_sbrk 12
++#define SYS_sleep 13
+ #define SYS_uptime 14
+-#define SYS_open   15
+-#define SYS_write  16
+-#define SYS_mknod  17
++#define SYS_open 15
++#define SYS_write 16
++#define SYS_mknod 17
+ #define SYS_unlink 18
+-#define SYS_link   19
+-#define SYS_mkdir  20
+-#define SYS_close  21
++#define SYS_link 19
++#define SYS_mkdir 20
++#define SYS_close 21
++#define SYS_history 22
++#define SYS_wait2 23
++
+diff -uN xv6-public/sysproc.c os-lab/sysproc.c
+--- xv6-public/sysproc.c	2021-09-15 18:10:18.260321100 +0530
++++ os-lab/sysproc.c	2021-09-13 19:24:56.459306681 +0530
+@@ -7,67 +7,76 @@
+ #include "mmu.h"
+ #include "proc.h"
+ 
+-int
+-sys_fork(void)
++int sys_fork(void)
+ {
+   return fork();
+ }
+ 
+-int
+-sys_exit(void)
++int sys_exit(void)
+ {
+   exit();
+-  return 0;  // not reached
++  return 0; // not reached
+ }
+ 
+-int
+-sys_wait(void)
++int sys_wait(void)
+ {
+   return wait();
+ }
+ 
++
++int 
++sys_wait2(void)
++{
++  int *stime;
++  int *retime;
++  int *rutime;
++  if(argptr(0, (void*)&retime, sizeof(retime))<0) return-1;
++  if(argptr(1, (void*)&rutime, sizeof(rutime))<0) return-1;
++  if(argptr(2, (void*)&stime, sizeof(stime))<0) return -1;
++  return wait2(retime,rutime,stime);
++}
++
+ int
+ sys_kill(void)
+ {
+   int pid;
+ 
+-  if(argint(0, &pid) < 0)
++  if (argint(0, &pid) < 0)
+     return -1;
+   return kill(pid);
+ }
+ 
+-int
+-sys_getpid(void)
++int sys_getpid(void)
+ {
+   return myproc()->pid;
+ }
+ 
+-int
+-sys_sbrk(void)
++int sys_sbrk(void)
+ {
+   int addr;
+   int n;
+ 
+-  if(argint(0, &n) < 0)
++  if (argint(0, &n) < 0)
+     return -1;
+   addr = myproc()->sz;
+-  if(growproc(n) < 0)
++  if (growproc(n) < 0)
+     return -1;
+   return addr;
+ }
+ 
+-int
+-sys_sleep(void)
++int sys_sleep(void)
+ {
+   int n;
+   uint ticks0;
+ 
+-  if(argint(0, &n) < 0)
++  if (argint(0, &n) < 0)
+     return -1;
+   acquire(&tickslock);
+   ticks0 = ticks;
+-  while(ticks - ticks0 < n){
+-    if(myproc()->killed){
++  while (ticks - ticks0 < n)
++  {
++    if (myproc()->killed)
++    {
+       release(&tickslock);
+       return -1;
+     }
+@@ -79,8 +88,7 @@
+ 
+ // return how many clock tick interrupts have occurred
+ // since start.
+-int
+-sys_uptime(void)
++int sys_uptime(void)
+ {
+   uint xticks;
+ 
+@@ -89,3 +97,12 @@
+   release(&tickslock);
+   return xticks;
+ }
++
++int sys_history(void)
++{
++  char *buffer;
++  int historyId;
++  argint(1, &historyId);
++  argptr(0, &buffer, 128);
++  return history(buffer, historyId);
++}
+\ No newline at end of file
+diff -uN xv6-public/trap.c os-lab/trap.c
+--- xv6-public/trap.c	2021-09-15 18:10:18.260321100 +0530
++++ os-lab/trap.c	2021-09-13 19:24:56.463306693 +0530
+@@ -51,6 +51,7 @@
+     if(cpuid() == 0){
+       acquire(&tickslock);
+       ticks++;
++      updateStats();
+       wakeup(&ticks);
+       release(&tickslock);
+     }
+diff -uN xv6-public/user.h os-lab/user.h
+--- xv6-public/user.h	2021-09-15 18:10:18.260321100 +0530
++++ os-lab/user.h	2021-09-13 19:24:56.463306693 +0530
+@@ -23,6 +23,8 @@
+ char* sbrk(int);
+ int sleep(int);
+ int uptime(void);
++int history(char*,int);
++int wait2(int*, int*, int*);
+ 
+ // ulib.c
+ int stat(const char*, struct stat*);
+diff -uN xv6-public/usys.S os-lab/usys.S
+--- xv6-public/usys.S	2021-09-15 18:10:18.260321100 +0530
++++ os-lab/usys.S	2021-09-13 19:24:56.463306693 +0530
+@@ -29,3 +29,5 @@
+ SYSCALL(sbrk)
+ SYSCALL(sleep)
+ SYSCALL(uptime)
++SYSCALL(history)
++SYSCALL(wait2)
+\ No newline at end of file
+Common subdirectories: xv6-public/.vscode and os-lab/.vscode
+diff -uN xv6-public/wait2.c os-lab/wait2.c
+--- xv6-public/wait2.c	1970-01-01 05:30:00.000000000 +0530
++++ os-lab/wait2.c	2021-09-15 18:05:10.404284206 +0530
+@@ -0,0 +1,23 @@
++#include "types.h"
++#include "stat.h"
++#include "user.h"
++
++int main()
++{
++    int i = 0;
++
++    while (i < 2)
++    {
++        i++;
++        int retime, rutime, stime;
++        fork();
++        int pid = wait2(&retime, &rutime, &stime);
++        if (pid == -1)
++        {
++            printf(1, "No terminated child found for pid = %d\n", getpid());
++            continue;
++        }
++        printf(1, "parent pid=%d, child pid:%d Retime:%d STime:%d Rutime:%d\n", getpid(), pid, retime, stime, rutime);
++    }
++    exit();
++}
