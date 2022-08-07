@@ -1,0 +1,980 @@
+diff -uN xv6-public/defs.h os-lab/defs.h
+--- xv6-public/defs.h	2021-10-31 16:07:13.819238110 +0530
++++ os-lab/defs.h	2021-10-31 16:20:44.352128208 +0530
+@@ -11,180 +11,182 @@
+ struct superblock;
+ 
+ // bio.c
+-void            binit(void);
+-struct buf*     bread(uint, uint);
+-void            brelse(struct buf*);
+-void            bwrite(struct buf*);
++void binit(void);
++struct buf *bread(uint, uint);
++void brelse(struct buf *);
++void bwrite(struct buf *);
+ 
+ // console.c
+-void            consoleinit(void);
+-void            cprintf(char*, ...);
+-void            consoleintr(int(*)(void));
+-void            panic(char*) __attribute__((noreturn));
++void consoleinit(void);
++void cprintf(char *, ...);
++void consoleintr(int (*)(void));
++void panic(char *) __attribute__((noreturn));
+ 
+ // exec.c
+-int             exec(char*, char**);
++int exec(char *, char **);
+ 
+ // file.c
+-struct file*    filealloc(void);
+-void            fileclose(struct file*);
+-struct file*    filedup(struct file*);
+-void            fileinit(void);
+-int             fileread(struct file*, char*, int n);
+-int             filestat(struct file*, struct stat*);
+-int             filewrite(struct file*, char*, int n);
++struct file *filealloc(void);
++void fileclose(struct file *);
++struct file *filedup(struct file *);
++void fileinit(void);
++int fileread(struct file *, char *, int n);
++int filestat(struct file *, struct stat *);
++int filewrite(struct file *, char *, int n);
+ 
+ // fs.c
+-void            readsb(int dev, struct superblock *sb);
+-int             dirlink(struct inode*, char*, uint);
+-struct inode*   dirlookup(struct inode*, char*, uint*);
+-struct inode*   ialloc(uint, short);
+-struct inode*   idup(struct inode*);
+-void            iinit(int dev);
+-void            ilock(struct inode*);
+-void            iput(struct inode*);
+-void            iunlock(struct inode*);
+-void            iunlockput(struct inode*);
+-void            iupdate(struct inode*);
+-int             namecmp(const char*, const char*);
+-struct inode*   namei(char*);
+-struct inode*   nameiparent(char*, char*);
+-int             readi(struct inode*, char*, uint, uint);
+-void            stati(struct inode*, struct stat*);
+-int             writei(struct inode*, char*, uint, uint);
++void readsb(int dev, struct superblock *sb);
++int dirlink(struct inode *, char *, uint);
++struct inode *dirlookup(struct inode *, char *, uint *);
++struct inode *ialloc(uint, short);
++struct inode *idup(struct inode *);
++void iinit(int dev);
++void ilock(struct inode *);
++void iput(struct inode *);
++void iunlock(struct inode *);
++void iunlockput(struct inode *);
++void iupdate(struct inode *);
++int namecmp(const char *, const char *);
++struct inode *namei(char *);
++struct inode *nameiparent(char *, char *);
++int readi(struct inode *, char *, uint, uint);
++void stati(struct inode *, struct stat *);
++int writei(struct inode *, char *, uint, uint);
+ 
+ // ide.c
+-void            ideinit(void);
+-void            ideintr(void);
+-void            iderw(struct buf*);
++void ideinit(void);
++void ideintr(void);
++void iderw(struct buf *);
+ 
+ // ioapic.c
+-void            ioapicenable(int irq, int cpu);
+-extern uchar    ioapicid;
+-void            ioapicinit(void);
++void ioapicenable(int irq, int cpu);
++extern uchar ioapicid;
++void ioapicinit(void);
+ 
+ // kalloc.c
+-char*           kalloc(void);
+-void            kfree(char*);
+-void            kinit1(void*, void*);
+-void            kinit2(void*, void*);
++char *kalloc(void);
++void kfree(char *);
++void kinit1(void *, void *);
++void kinit2(void *, void *);
+ 
+ // kbd.c
+-void            kbdintr(void);
++void kbdintr(void);
+ 
+ // lapic.c
+-void            cmostime(struct rtcdate *r);
+-int             lapicid(void);
+-extern volatile uint*    lapic;
+-void            lapiceoi(void);
+-void            lapicinit(void);
+-void            lapicstartap(uchar, uint);
+-void            microdelay(int);
++void cmostime(struct rtcdate *r);
++int lapicid(void);
++extern volatile uint *lapic;
++void lapiceoi(void);
++void lapicinit(void);
++void lapicstartap(uchar, uint);
++void microdelay(int);
+ 
+ // log.c
+-void            initlog(int dev);
+-void            log_write(struct buf*);
+-void            begin_op();
+-void            end_op();
++void initlog(int dev);
++void log_write(struct buf *);
++void begin_op();
++void end_op();
+ 
+ // mp.c
+-extern int      ismp;
+-void            mpinit(void);
++extern int ismp;
++void mpinit(void);
+ 
+ // picirq.c
+-void            picenable(int);
+-void            picinit(void);
++void picenable(int);
++void picinit(void);
+ 
+ // pipe.c
+-int             pipealloc(struct file**, struct file**);
+-void            pipeclose(struct pipe*, int);
+-int             piperead(struct pipe*, char*, int);
+-int             pipewrite(struct pipe*, char*, int);
++int pipealloc(struct file **, struct file **);
++void pipeclose(struct pipe *, int);
++int piperead(struct pipe *, char *, int);
++int pipewrite(struct pipe *, char *, int);
+ 
+ //PAGEBREAK: 16
+ // proc.c
+-int             cpuid(void);
+-void            exit(void);
+-int             fork(void);
+-int             growproc(int);
+-int             kill(int);
+-struct cpu*     mycpu(void);
+-struct proc*    myproc();
+-void            pinit(void);
+-void            procdump(void);
+-void            scheduler(void) __attribute__((noreturn));
+-void            sched(void);
+-void            setproc(struct proc*);
+-void            sleep(void*, struct spinlock*);
+-void            userinit(void);
+-int             wait(void);
+-void            wakeup(void*);
+-void            yield(void);
++int cpuid(void);
++void exit(void);
++int fork(void);
++int growproc(int);
++int kill(int);
++struct cpu *mycpu(void);
++struct proc *myproc();
++void pinit(void);
++void procdump(void);
++void scheduler(void) __attribute__((noreturn));
++void sched(void);
++void setproc(struct proc *);
++void sleep(void *, struct spinlock *);
++void userinit(void);
++int wait(void);
++void wakeup(void *);
++void yield(void);
+ 
+ // swtch.S
+-void            swtch(struct context**, struct context*);
++void swtch(struct context **, struct context *);
+ 
+ // spinlock.c
+-void            acquire(struct spinlock*);
+-void            getcallerpcs(void*, uint*);
+-int             holding(struct spinlock*);
+-void            initlock(struct spinlock*, char*);
+-void            release(struct spinlock*);
+-void            pushcli(void);
+-void            popcli(void);
++void acquire(struct spinlock *);
++void getcallerpcs(void *, uint *);
++int holding(struct spinlock *);
++void initlock(struct spinlock *, char *);
++void release(struct spinlock *);
++void pushcli(void);
++void popcli(void);
+ 
+ // sleeplock.c
+-void            acquiresleep(struct sleeplock*);
+-void            releasesleep(struct sleeplock*);
+-int             holdingsleep(struct sleeplock*);
+-void            initsleeplock(struct sleeplock*, char*);
++void acquiresleep(struct sleeplock *);
++void releasesleep(struct sleeplock *);
++int holdingsleep(struct sleeplock *);
++void initsleeplock(struct sleeplock *, char *);
+ 
+ // string.c
+-int             memcmp(const void*, const void*, uint);
+-void*           memmove(void*, const void*, uint);
+-void*           memset(void*, int, uint);
+-char*           safestrcpy(char*, const char*, int);
+-int             strlen(const char*);
+-int             strncmp(const char*, const char*, uint);
+-char*           strncpy(char*, const char*, int);
++int memcmp(const void *, const void *, uint);
++void *memmove(void *, const void *, uint);
++void *memset(void *, int, uint);
++char *safestrcpy(char *, const char *, int);
++int strlen(const char *);
++int strncmp(const char *, const char *, uint);
++char *strncpy(char *, const char *, int);
+ 
+ // syscall.c
+-int             argint(int, int*);
+-int             argptr(int, char**, int);
+-int             argstr(int, char**);
+-int             fetchint(uint, int*);
+-int             fetchstr(uint, char**);
+-void            syscall(void);
++int argint(int, int *);
++int argptr(int, char **, int);
++int argstr(int, char **);
++int fetchint(uint, int *);
++int fetchstr(uint, char **);
++void syscall(void);
+ 
+ // timer.c
+-void            timerinit(void);
++void timerinit(void);
+ 
+ // trap.c
+-void            idtinit(void);
+-extern uint     ticks;
+-void            tvinit(void);
++void idtinit(void);
++extern uint ticks;
++void tvinit(void);
+ extern struct spinlock tickslock;
+ 
+ // uart.c
+-void            uartinit(void);
+-void            uartintr(void);
+-void            uartputc(int);
++void uartinit(void);
++void uartintr(void);
++void uartputc(int);
+ 
+ // vm.c
+-void            seginit(void);
+-void            kvmalloc(void);
+-pde_t*          setupkvm(void);
+-char*           uva2ka(pde_t*, char*);
+-int             allocuvm(pde_t*, uint, uint);
+-int             deallocuvm(pde_t*, uint, uint);
+-void            freevm(pde_t*);
+-void            inituvm(pde_t*, char*, uint);
+-int             loaduvm(pde_t*, char*, struct inode*, uint, uint);
+-pde_t*          copyuvm(pde_t*, uint);
+-void            switchuvm(struct proc*);
+-void            switchkvm(void);
+-int             copyout(pde_t*, uint, void*, uint);
+-void            clearpteu(pde_t *pgdir, char *uva);
++void seginit(void);
++void kvmalloc(void);
++pde_t *setupkvm(void);
++char *uva2ka(pde_t *, char *);
++int allocuvm(pde_t *, uint, uint);
++int deallocuvm(pde_t *, uint, uint);
++void freevm(pde_t *);
++void inituvm(pde_t *, char *, uint);
++int loaduvm(pde_t *, char *, struct inode *, uint, uint);
++pde_t *copyuvm(pde_t *, uint);
++void switchuvm(struct proc *);
++void switchkvm(void);
++int copyout(pde_t *, uint, void *, uint);
++void clearpteu(pde_t *pgdir, char *uva);
++int handle_page_fault(pde_t *pgdir, uint vm);
++int handle_page_fault(pde_t *pgdir, uint vm);
+ 
+ // number of elements in fixed-size array
+-#define NELEM(x) (sizeof(x)/sizeof((x)[0]))
++#define NELEM(x) (sizeof(x) / sizeof((x)[0]))
+Common subdirectories: xv6-public/.git and os-lab/.git
+diff -uN xv6-public/.gitignore os-lab/.gitignore
+--- xv6-public/.gitignore	2021-10-31 16:07:13.815238137 +0530
++++ os-lab/.gitignore	2021-10-31 16:18:57.821183857 +0530
+@@ -14,3 +14,4 @@
+ kernelmemfs
+ mkfs
+ .gdbinit
++.vscode
+\ No newline at end of file
+diff -uN xv6-public/sysproc.c os-lab/sysproc.c
+--- xv6-public/sysproc.c	2021-10-31 16:07:13.823238083 +0530
++++ os-lab/sysproc.c	2021-10-31 16:26:05.380846095 +0530
+@@ -7,67 +7,63 @@
+ #include "mmu.h"
+ #include "proc.h"
+ 
+-int
+-sys_fork(void)
++int sys_fork(void)
+ {
+   return fork();
+ }
+ 
+-int
+-sys_exit(void)
++int sys_exit(void)
+ {
+   exit();
+-  return 0;  // not reached
++  return 0; // not reached
+ }
+ 
+-int
+-sys_wait(void)
++int sys_wait(void)
+ {
+   return wait();
+ }
+ 
+-int
+-sys_kill(void)
++int sys_kill(void)
+ {
+   int pid;
+ 
+-  if(argint(0, &pid) < 0)
++  if (argint(0, &pid) < 0)
+     return -1;
+   return kill(pid);
+ }
+ 
+-int
+-sys_getpid(void)
++int sys_getpid(void)
+ {
+   return myproc()->pid;
+ }
+ 
+-int
+-sys_sbrk(void)
++int sys_sbrk(void)
+ {
+   int addr;
+   int n;
+ 
+-  if(argint(0, &n) < 0)
++  if (argint(0, &n) < 0)
+     return -1;
+   addr = myproc()->sz;
+-  if(growproc(n) < 0)
+-    return -1;
++  myproc()->sz += n;
++  // if (growproc(n) < 0)
++  //   return -1;
+   return addr;
+ }
+ 
+-int
+-sys_sleep(void)
++int sys_sleep(void)
+ {
+   int n;
+   uint ticks0;
+ 
+-  if(argint(0, &n) < 0)
++  if (argint(0, &n) < 0)
+     return -1;
+   acquire(&tickslock);
+   ticks0 = ticks;
+-  while(ticks - ticks0 < n){
+-    if(myproc()->killed){
++  while (ticks - ticks0 < n)
++  {
++    if (myproc()->killed)
++    {
+       release(&tickslock);
+       return -1;
+     }
+@@ -79,8 +75,7 @@
+ 
+ // return how many clock tick interrupts have occurred
+ // since start.
+-int
+-sys_uptime(void)
++int sys_uptime(void)
+ {
+   uint xticks;
+ 
+diff -uN xv6-public/trap.c os-lab/trap.c
+--- xv6-public/trap.c	2021-10-31 16:07:13.823238083 +0530
++++ os-lab/trap.c	2021-10-31 16:26:35.228535238 +0530
+@@ -10,45 +10,45 @@
+ 
+ // Interrupt descriptor table (shared by all CPUs).
+ struct gatedesc idt[256];
+-extern uint vectors[];  // in vectors.S: array of 256 entry pointers
++extern uint vectors[]; // in vectors.S: array of 256 entry pointers
+ struct spinlock tickslock;
+ uint ticks;
+ 
+-void
+-tvinit(void)
++void tvinit(void)
+ {
+   int i;
+ 
+-  for(i = 0; i < 256; i++)
+-    SETGATE(idt[i], 0, SEG_KCODE<<3, vectors[i], 0);
+-  SETGATE(idt[T_SYSCALL], 1, SEG_KCODE<<3, vectors[T_SYSCALL], DPL_USER);
++  for (i = 0; i < 256; i++)
++    SETGATE(idt[i], 0, SEG_KCODE << 3, vectors[i], 0);
++  SETGATE(idt[T_SYSCALL], 1, SEG_KCODE << 3, vectors[T_SYSCALL], DPL_USER);
+ 
+   initlock(&tickslock, "time");
+ }
+ 
+-void
+-idtinit(void)
++void idtinit(void)
+ {
+   lidt(idt, sizeof(idt));
+ }
+ 
+ //PAGEBREAK: 41
+-void
+-trap(struct trapframe *tf)
++void trap(struct trapframe *tf)
+ {
+-  if(tf->trapno == T_SYSCALL){
+-    if(myproc()->killed)
++  if (tf->trapno == T_SYSCALL)
++  {
++    if (myproc()->killed)
+       exit();
+     myproc()->tf = tf;
+     syscall();
+-    if(myproc()->killed)
++    if (myproc()->killed)
+       exit();
+     return;
+   }
+ 
+-  switch(tf->trapno){
++  switch (tf->trapno)
++  {
+   case T_IRQ0 + IRQ_TIMER:
+-    if(cpuid() == 0){
++    if (cpuid() == 0)
++    {
+       acquire(&tickslock);
+       ticks++;
+       wakeup(&ticks);
+@@ -60,7 +60,7 @@
+     ideintr();
+     lapiceoi();
+     break;
+-  case T_IRQ0 + IRQ_IDE+1:
++  case T_IRQ0 + IRQ_IDE + 1:
+     // Bochs generates spurious IDE1 interrupts.
+     break;
+   case T_IRQ0 + IRQ_KBD:
+@@ -80,7 +80,17 @@
+ 
+   //PAGEBREAK: 13
+   default:
+-    if(myproc() == 0 || (tf->cs&3) == 0){
++    if (tf->trapno == T_PGFLT)
++    {
++      pde_t *pgdir = myproc()->pgdir;
++      if (handle_page_fault(pgdir, rcr2()) == 1)
++      {
++        break;
++      }
++    }
++
++    if (myproc() == 0 || (tf->cs & 3) == 0)
++    {
+       // In kernel, it must be our mistake.
+       cprintf("unexpected trap %d from cpu %d eip %x (cr2=0x%x)\n",
+               tf->trapno, cpuid(), tf->eip, rcr2());
+@@ -97,16 +107,16 @@
+   // Force process exit if it has been killed and is in user space.
+   // (If it is still executing in the kernel, let it keep running
+   // until it gets to the regular system call return.)
+-  if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
++  if (myproc() && myproc()->killed && (tf->cs & 3) == DPL_USER)
+     exit();
+ 
+   // Force process to give up CPU on clock tick.
+   // If interrupts were on while locks held, would need to check nlock.
+-  if(myproc() && myproc()->state == RUNNING &&
+-     tf->trapno == T_IRQ0+IRQ_TIMER)
++  if (myproc() && myproc()->state == RUNNING &&
++      tf->trapno == T_IRQ0 + IRQ_TIMER)
+     yield();
+ 
+   // Check if the process has been killed since we yielded
+-  if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
++  if (myproc() && myproc()->killed && (tf->cs & 3) == DPL_USER)
+     exit();
+ }
+diff -uN xv6-public/vm.c os-lab/vm.c
+--- xv6-public/vm.c	2021-10-31 16:07:13.823238083 +0530
++++ os-lab/vm.c	2021-10-31 16:25:30.605207264 +0530
+@@ -7,13 +7,12 @@
+ #include "proc.h"
+ #include "elf.h"
+ 
+-extern char data[];  // defined by kernel.ld
+-pde_t *kpgdir;  // for use in scheduler()
++extern char data[]; // defined by kernel.ld
++pde_t *kpgdir;      // for use in scheduler()
+ 
+ // Set up CPU's kernel segment descriptors.
+ // Run once on entry on each CPU.
+-void
+-seginit(void)
++void seginit(void)
+ {
+   struct cpu *c;
+ 
+@@ -22,9 +21,9 @@
+   // because it would have to have DPL_USR, but the CPU forbids
+   // an interrupt from CPL=0 to DPL=3.
+   c = &cpus[cpuid()];
+-  c->gdt[SEG_KCODE] = SEG(STA_X|STA_R, 0, 0xffffffff, 0);
++  c->gdt[SEG_KCODE] = SEG(STA_X | STA_R, 0, 0xffffffff, 0);
+   c->gdt[SEG_KDATA] = SEG(STA_W, 0, 0xffffffff, 0);
+-  c->gdt[SEG_UCODE] = SEG(STA_X|STA_R, 0, 0xffffffff, DPL_USER);
++  c->gdt[SEG_UCODE] = SEG(STA_X | STA_R, 0, 0xffffffff, DPL_USER);
+   c->gdt[SEG_UDATA] = SEG(STA_W, 0, 0xffffffff, DPL_USER);
+   lgdt(c->gdt, sizeof(c->gdt));
+ }
+@@ -39,10 +38,13 @@
+   pte_t *pgtab;
+ 
+   pde = &pgdir[PDX(va)];
+-  if(*pde & PTE_P){
+-    pgtab = (pte_t*)P2V(PTE_ADDR(*pde));
+-  } else {
+-    if(!alloc || (pgtab = (pte_t*)kalloc()) == 0)
++  if (*pde & PTE_P)
++  {
++    pgtab = (pte_t *)P2V(PTE_ADDR(*pde));
++  }
++  else
++  {
++    if (!alloc || (pgtab = (pte_t *)kalloc()) == 0)
+       return 0;
+     // Make sure all those PTE_P bits are zero.
+     memset(pgtab, 0, PGSIZE);
+@@ -63,15 +65,16 @@
+   char *a, *last;
+   pte_t *pte;
+ 
+-  a = (char*)PGROUNDDOWN((uint)va);
+-  last = (char*)PGROUNDDOWN(((uint)va) + size - 1);
+-  for(;;){
+-    if((pte = walkpgdir(pgdir, a, 1)) == 0)
++  a = (char *)PGROUNDDOWN((uint)va);
++  last = (char *)PGROUNDDOWN(((uint)va) + size - 1);
++  for (;;)
++  {
++    if ((pte = walkpgdir(pgdir, a, 1)) == 0)
+       return -1;
+-    if(*pte & PTE_P)
++    if (*pte & PTE_P)
+       panic("remap");
+     *pte = pa | perm | PTE_P;
+-    if(a == last)
++    if (a == last)
+       break;
+     a += PGSIZE;
+     pa += PGSIZE;
+@@ -102,33 +105,35 @@
+ 
+ // This table defines the kernel's mappings, which are present in
+ // every process's page table.
+-static struct kmap {
++static struct kmap
++{
+   void *virt;
+   uint phys_start;
+   uint phys_end;
+   int perm;
+ } kmap[] = {
+- { (void*)KERNBASE, 0,             EXTMEM,    PTE_W}, // I/O space
+- { (void*)KERNLINK, V2P(KERNLINK), V2P(data), 0},     // kern text+rodata
+- { (void*)data,     V2P(data),     PHYSTOP,   PTE_W}, // kern data+memory
+- { (void*)DEVSPACE, DEVSPACE,      0,         PTE_W}, // more devices
++    {(void *)KERNBASE, 0, EXTMEM, PTE_W},            // I/O space
++    {(void *)KERNLINK, V2P(KERNLINK), V2P(data), 0}, // kern text+rodata
++    {(void *)data, V2P(data), PHYSTOP, PTE_W},       // kern data+memory
++    {(void *)DEVSPACE, DEVSPACE, 0, PTE_W},          // more devices
+ };
+ 
+ // Set up kernel part of a page table.
+-pde_t*
++pde_t *
+ setupkvm(void)
+ {
+   pde_t *pgdir;
+   struct kmap *k;
+ 
+-  if((pgdir = (pde_t*)kalloc()) == 0)
++  if ((pgdir = (pde_t *)kalloc()) == 0)
+     return 0;
+   memset(pgdir, 0, PGSIZE);
+-  if (P2V(PHYSTOP) > (void*)DEVSPACE)
++  if (P2V(PHYSTOP) > (void *)DEVSPACE)
+     panic("PHYSTOP too high");
+-  for(k = kmap; k < &kmap[NELEM(kmap)]; k++)
+-    if(mappages(pgdir, k->virt, k->phys_end - k->phys_start,
+-                (uint)k->phys_start, k->perm) < 0) {
++  for (k = kmap; k < &kmap[NELEM(kmap)]; k++)
++    if (mappages(pgdir, k->virt, k->phys_end - k->phys_start,
++                 (uint)k->phys_start, k->perm) < 0)
++    {
+       freevm(pgdir);
+       return 0;
+     }
+@@ -137,8 +142,7 @@
+ 
+ // Allocate one page table for the machine for the kernel address
+ // space for scheduler processes.
+-void
+-kvmalloc(void)
++void kvmalloc(void)
+ {
+   kpgdir = setupkvm();
+   switchkvm();
+@@ -146,71 +150,68 @@
+ 
+ // Switch h/w page table register to the kernel-only page table,
+ // for when no process is running.
+-void
+-switchkvm(void)
++void switchkvm(void)
+ {
+-  lcr3(V2P(kpgdir));   // switch to the kernel page table
++  lcr3(V2P(kpgdir)); // switch to the kernel page table
+ }
+ 
+ // Switch TSS and h/w page table to correspond to process p.
+-void
+-switchuvm(struct proc *p)
++void switchuvm(struct proc *p)
+ {
+-  if(p == 0)
++  if (p == 0)
+     panic("switchuvm: no process");
+-  if(p->kstack == 0)
++  if (p->kstack == 0)
+     panic("switchuvm: no kstack");
+-  if(p->pgdir == 0)
++  if (p->pgdir == 0)
+     panic("switchuvm: no pgdir");
+ 
+   pushcli();
+   mycpu()->gdt[SEG_TSS] = SEG16(STS_T32A, &mycpu()->ts,
+-                                sizeof(mycpu()->ts)-1, 0);
++                                sizeof(mycpu()->ts) - 1, 0);
+   mycpu()->gdt[SEG_TSS].s = 0;
+   mycpu()->ts.ss0 = SEG_KDATA << 3;
+   mycpu()->ts.esp0 = (uint)p->kstack + KSTACKSIZE;
+   // setting IOPL=0 in eflags *and* iomb beyond the tss segment limit
+   // forbids I/O instructions (e.g., inb and outb) from user space
+-  mycpu()->ts.iomb = (ushort) 0xFFFF;
++  mycpu()->ts.iomb = (ushort)0xFFFF;
+   ltr(SEG_TSS << 3);
+-  lcr3(V2P(p->pgdir));  // switch to process's address space
++  lcr3(V2P(p->pgdir)); // switch to process's address space
+   popcli();
+ }
+ 
+ // Load the initcode into address 0 of pgdir.
+ // sz must be less than a page.
+-void
+-inituvm(pde_t *pgdir, char *init, uint sz)
++void inituvm(pde_t *pgdir, char *init, uint sz)
+ {
+   char *mem;
+ 
+-  if(sz >= PGSIZE)
++  if (sz >= PGSIZE)
+     panic("inituvm: more than a page");
+   mem = kalloc();
+   memset(mem, 0, PGSIZE);
+-  mappages(pgdir, 0, PGSIZE, V2P(mem), PTE_W|PTE_U);
++  mappages(pgdir, 0, PGSIZE, V2P(mem), PTE_W | PTE_U);
+   memmove(mem, init, sz);
+ }
+ 
+ // Load a program segment into pgdir.  addr must be page-aligned
+ // and the pages from addr to addr+sz must already be mapped.
+-int
+-loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
++int loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
+ {
+   uint i, pa, n;
+   pte_t *pte;
+ 
+-  if((uint) addr % PGSIZE != 0)
++  if ((uint)addr % PGSIZE != 0)
+     panic("loaduvm: addr must be page aligned");
+-  for(i = 0; i < sz; i += PGSIZE){
+-    if((pte = walkpgdir(pgdir, addr+i, 0)) == 0)
++  for (i = 0; i < sz; i += PGSIZE)
++  {
++    if ((pte = walkpgdir(pgdir, addr + i, 0)) == 0)
+       panic("loaduvm: address should exist");
+     pa = PTE_ADDR(*pte);
+-    if(sz - i < PGSIZE)
++    if (sz - i < PGSIZE)
+       n = sz - i;
+     else
+       n = PGSIZE;
+-    if(readi(ip, P2V(pa), offset+i, n) != n)
++    if (readi(ip, P2V(pa), offset + i, n) != n)
+       return -1;
+   }
+   return 0;
+@@ -218,27 +219,29 @@
+ 
+ // Allocate page tables and physical memory to grow process from oldsz to
+ // newsz, which need not be page aligned.  Returns new size or 0 on error.
+-int
+-allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
++int allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
+ {
+   char *mem;
+   uint a;
+ 
+-  if(newsz >= KERNBASE)
++  if (newsz >= KERNBASE)
+     return 0;
+-  if(newsz < oldsz)
++  if (newsz < oldsz)
+     return oldsz;
+ 
+   a = PGROUNDUP(oldsz);
+-  for(; a < newsz; a += PGSIZE){
++  for (; a < newsz; a += PGSIZE)
++  {
+     mem = kalloc();
+-    if(mem == 0){
++    if (mem == 0)
++    {
+       cprintf("allocuvm out of memory\n");
+       deallocuvm(pgdir, newsz, oldsz);
+       return 0;
+     }
+     memset(mem, 0, PGSIZE);
+-    if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U) < 0){
++    if (mappages(pgdir, (char *)a, PGSIZE, V2P(mem), PTE_W | PTE_U) < 0)
++    {
+       cprintf("allocuvm out of memory (2)\n");
+       deallocuvm(pgdir, newsz, oldsz);
+       kfree(mem);
+@@ -252,23 +255,24 @@
+ // newsz.  oldsz and newsz need not be page-aligned, nor does newsz
+ // need to be less than oldsz.  oldsz can be larger than the actual
+ // process size.  Returns the new process size.
+-int
+-deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
++int deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
+ {
+   pte_t *pte;
+   uint a, pa;
+ 
+-  if(newsz >= oldsz)
++  if (newsz >= oldsz)
+     return oldsz;
+ 
+   a = PGROUNDUP(newsz);
+-  for(; a  < oldsz; a += PGSIZE){
+-    pte = walkpgdir(pgdir, (char*)a, 0);
+-    if(!pte)
++  for (; a < oldsz; a += PGSIZE)
++  {
++    pte = walkpgdir(pgdir, (char *)a, 0);
++    if (!pte)
+       a = PGADDR(PDX(a) + 1, 0, 0) - PGSIZE;
+-    else if((*pte & PTE_P) != 0){
++    else if ((*pte & PTE_P) != 0)
++    {
+       pa = PTE_ADDR(*pte);
+-      if(pa == 0)
++      if (pa == 0)
+         panic("kfree");
+       char *v = P2V(pa);
+       kfree(v);
+@@ -280,39 +284,39 @@
+ 
+ // Free a page table and all the physical memory pages
+ // in the user part.
+-void
+-freevm(pde_t *pgdir)
++void freevm(pde_t *pgdir)
+ {
+   uint i;
+ 
+-  if(pgdir == 0)
++  if (pgdir == 0)
+     panic("freevm: no pgdir");
+   deallocuvm(pgdir, KERNBASE, 0);
+-  for(i = 0; i < NPDENTRIES; i++){
+-    if(pgdir[i] & PTE_P){
+-      char * v = P2V(PTE_ADDR(pgdir[i]));
++  for (i = 0; i < NPDENTRIES; i++)
++  {
++    if (pgdir[i] & PTE_P)
++    {
++      char *v = P2V(PTE_ADDR(pgdir[i]));
+       kfree(v);
+     }
+   }
+-  kfree((char*)pgdir);
++  kfree((char *)pgdir);
+ }
+ 
+ // Clear PTE_U on a page. Used to create an inaccessible
+ // page beneath the user stack.
+-void
+-clearpteu(pde_t *pgdir, char *uva)
++void clearpteu(pde_t *pgdir, char *uva)
+ {
+   pte_t *pte;
+ 
+   pte = walkpgdir(pgdir, uva, 0);
+-  if(pte == 0)
++  if (pte == 0)
+     panic("clearpteu");
+   *pte &= ~PTE_U;
+ }
+ 
+ // Given a parent process's page table, create a copy
+ // of it for a child.
+-pde_t*
++pde_t *
+ copyuvm(pde_t *pgdir, uint sz)
+ {
+   pde_t *d;
+@@ -320,19 +324,21 @@
+   uint pa, i, flags;
+   char *mem;
+ 
+-  if((d = setupkvm()) == 0)
++  if ((d = setupkvm()) == 0)
+     return 0;
+-  for(i = 0; i < sz; i += PGSIZE){
+-    if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
++  for (i = 0; i < sz; i += PGSIZE)
++  {
++    if ((pte = walkpgdir(pgdir, (void *)i, 0)) == 0)
+       panic("copyuvm: pte should exist");
+-    if(!(*pte & PTE_P))
++    if (!(*pte & PTE_P))
+       panic("copyuvm: page not present");
+     pa = PTE_ADDR(*pte);
+     flags = PTE_FLAGS(*pte);
+-    if((mem = kalloc()) == 0)
++    if ((mem = kalloc()) == 0)
+       goto bad;
+-    memmove(mem, (char*)P2V(pa), PGSIZE);
+-    if(mappages(d, (void*)i, PGSIZE, V2P(mem), flags) < 0) {
++    memmove(mem, (char *)P2V(pa), PGSIZE);
++    if (mappages(d, (void *)i, PGSIZE, V2P(mem), flags) < 0)
++    {
+       kfree(mem);
+       goto bad;
+     }
+@@ -346,36 +352,36 @@
+ 
+ //PAGEBREAK!
+ // Map user virtual address to kernel address.
+-char*
++char *
+ uva2ka(pde_t *pgdir, char *uva)
+ {
+   pte_t *pte;
+ 
+   pte = walkpgdir(pgdir, uva, 0);
+-  if((*pte & PTE_P) == 0)
++  if ((*pte & PTE_P) == 0)
+     return 0;
+-  if((*pte & PTE_U) == 0)
++  if ((*pte & PTE_U) == 0)
+     return 0;
+-  return (char*)P2V(PTE_ADDR(*pte));
++  return (char *)P2V(PTE_ADDR(*pte));
+ }
+ 
+ // Copy len bytes from p to user address va in page table pgdir.
+ // Most useful when pgdir is not the current page table.
+ // uva2ka ensures this only works for PTE_U pages.
+-int
+-copyout(pde_t *pgdir, uint va, void *p, uint len)
++int copyout(pde_t *pgdir, uint va, void *p, uint len)
+ {
+   char *buf, *pa0;
+   uint n, va0;
+ 
+-  buf = (char*)p;
+-  while(len > 0){
++  buf = (char *)p;
++  while (len > 0)
++  {
+     va0 = (uint)PGROUNDDOWN(va);
+-    pa0 = uva2ka(pgdir, (char*)va0);
+-    if(pa0 == 0)
++    pa0 = uva2ka(pgdir, (char *)va0);
++    if (pa0 == 0)
+       return -1;
+     n = PGSIZE - (va - va0);
+-    if(n > len)
++    if (n > len)
+       n = len;
+     memmove(pa0 + (va - va0), buf, n);
+     len -= n;
+@@ -392,3 +398,23 @@
+ //PAGEBREAK!
+ // Blank page.
+ 
++int handle_page_fault(pde_t *pgdir, uint vm)
++{
++  char *mem;
++  mem = kalloc();
++  if (mem == 0)
++  {
++    cprintf("Out of Memory.\n");
++    return 0;
++  }
++
++  memset(mem, 0, PGSIZE);
++  uint a = PGROUNDDOWN(vm);
++  if (mappages(pgdir, (char *)a, PGSIZE, V2P(mem), PTE_W | PTE_U) < 0)
++  {
++    cprintf("allocuvm out of memory (2)\n");
++    kfree(mem);
++    return 0;
++  }
++  return 1;
++}
+\ No newline at end of file
+Common subdirectories: xv6-public/.vscode and os-lab/.vscode
