@@ -1,0 +1,386 @@
+diff -uN xv6-public/drawtest.c xv6-modified/drawtest.c
+--- xv6-public/drawtest.c	1970-01-01 05:30:00.000000000 +0530
++++ xv6-modified/drawtest.c	2021-08-20 20:21:35.921006644 +0530
+@@ -0,0 +1,21 @@
++#include "types.h"
++#include "stat.h"
++#include "user.h"
++#include "fs.h"
++
++int main(int argc, char *argv[])
++{
++    // Create a char buffer of size 2048 to store ASCII art
++    char print_buffer[2048];
++
++    // If draw system call is unsuccessful, print error message
++    if (draw(&print_buffer, sizeof(print_buffer)) < 0)
++    {
++        printf(1, "drawtest: draw system call failed.\nTry increasing buffer size.\n");
++        exit();
++    }
++
++    // Otherwise, print ASCII art stored in print_buffer
++    printf(1, "%s", print_buffer);
++    exit();
++}
+\ No newline at end of file
+Common subdirectories: xv6-public/.git and xv6-modified/.git
+diff -uN xv6-public/Makefile xv6-modified/Makefile
+--- xv6-public/Makefile	2021-08-20 20:42:45.007273836 +0530
++++ xv6-modified/Makefile	2021-08-20 18:50:36.044421020 +0530
+@@ -27,6 +27,7 @@
+ 	uart.o\
+ 	vectors.o\
+ 	vm.o\
++	sysdraw.o\
+ 
+ # Cross-compiling (e.g., on Mac OS X)
+ # TOOLPREFIX = i386-jos-elf
+@@ -181,6 +182,7 @@
+ 	_usertests\
+ 	_wc\
+ 	_zombie\
++	_drawtest\
+ 
+ fs.img: mkfs README $(UPROGS)
+ 	./mkfs fs.img README $(UPROGS)
+diff -uN xv6-public/syscall.c xv6-modified/syscall.c
+--- xv6-public/syscall.c	2021-08-20 20:42:45.015272086 +0530
++++ xv6-modified/syscall.c	2021-08-20 13:48:34.313189348 +0530
+@@ -6,6 +6,7 @@
+ #include "proc.h"
+ #include "x86.h"
+ #include "syscall.h"
++#include "sysdraw.h"
+ 
+ // User code makes a system call with INT T_SYSCALL.
+ // System call number in %eax.
+@@ -14,58 +15,55 @@
+ // to a saved program counter, and then the first argument.
+ 
+ // Fetch the int at addr from the current process.
+-int
+-fetchint(uint addr, int *ip)
++int fetchint(uint addr, int *ip)
+ {
+   struct proc *curproc = myproc();
+ 
+-  if(addr >= curproc->sz || addr+4 > curproc->sz)
++  if (addr >= curproc->sz || addr + 4 > curproc->sz)
+     return -1;
+-  *ip = *(int*)(addr);
++  *ip = *(int *)(addr);
+   return 0;
+ }
+ 
+ // Fetch the nul-terminated string at addr from the current process.
+ // Doesn't actually copy the string - just sets *pp to point at it.
+ // Returns length of string, not including nul.
+-int
+-fetchstr(uint addr, char **pp)
++int fetchstr(uint addr, char **pp)
+ {
+   char *s, *ep;
+   struct proc *curproc = myproc();
+ 
+-  if(addr >= curproc->sz)
++  if (addr >= curproc->sz)
+     return -1;
+-  *pp = (char*)addr;
+-  ep = (char*)curproc->sz;
+-  for(s = *pp; s < ep; s++){
+-    if(*s == 0)
++  *pp = (char *)addr;
++  ep = (char *)curproc->sz;
++  for (s = *pp; s < ep; s++)
++  {
++    if (*s == 0)
+       return s - *pp;
+   }
+   return -1;
+ }
+ 
+ // Fetch the nth 32-bit system call argument.
+-int
+-argint(int n, int *ip)
++int argint(int n, int *ip)
+ {
+-  return fetchint((myproc()->tf->esp) + 4 + 4*n, ip);
++  return fetchint((myproc()->tf->esp) + 4 + 4 * n, ip);
+ }
+ 
+ // Fetch the nth word-sized system call argument as a pointer
+ // to a block of memory of size bytes.  Check that the pointer
+ // lies within the process address space.
+-int
+-argptr(int n, char **pp, int size)
++int argptr(int n, char **pp, int size)
+ {
+   int i;
+   struct proc *curproc = myproc();
+- 
+-  if(argint(n, &i) < 0)
++
++  if (argint(n, &i) < 0)
+     return -1;
+-  if(size < 0 || (uint)i >= curproc->sz || (uint)i+size > curproc->sz)
++  if (size < 0 || (uint)i >= curproc->sz || (uint)i + size > curproc->sz)
+     return -1;
+-  *pp = (char*)i;
++  *pp = (char *)i;
+   return 0;
+ }
+ 
+@@ -73,11 +71,10 @@
+ // Check that the pointer is valid and the string is nul-terminated.
+ // (There is no shared writable memory, so the string can't change
+ // between this check and being used by the kernel.)
+-int
+-argstr(int n, char **pp)
++int argstr(int n, char **pp)
+ {
+   int addr;
+-  if(argint(n, &addr) < 0)
++  if (argint(n, &addr) < 0)
+     return -1;
+   return fetchstr(addr, pp);
+ }
+@@ -103,41 +100,45 @@
+ extern int sys_wait(void);
+ extern int sys_write(void);
+ extern int sys_uptime(void);
++extern int sys_draw(void);
+ 
+ static int (*syscalls[])(void) = {
+-[SYS_fork]    sys_fork,
+-[SYS_exit]    sys_exit,
+-[SYS_wait]    sys_wait,
+-[SYS_pipe]    sys_pipe,
+-[SYS_read]    sys_read,
+-[SYS_kill]    sys_kill,
+-[SYS_exec]    sys_exec,
+-[SYS_fstat]   sys_fstat,
+-[SYS_chdir]   sys_chdir,
+-[SYS_dup]     sys_dup,
+-[SYS_getpid]  sys_getpid,
+-[SYS_sbrk]    sys_sbrk,
+-[SYS_sleep]   sys_sleep,
+-[SYS_uptime]  sys_uptime,
+-[SYS_open]    sys_open,
+-[SYS_write]   sys_write,
+-[SYS_mknod]   sys_mknod,
+-[SYS_unlink]  sys_unlink,
+-[SYS_link]    sys_link,
+-[SYS_mkdir]   sys_mkdir,
+-[SYS_close]   sys_close,
++    [SYS_fork] sys_fork,
++    [SYS_exit] sys_exit,
++    [SYS_wait] sys_wait,
++    [SYS_pipe] sys_pipe,
++    [SYS_read] sys_read,
++    [SYS_kill] sys_kill,
++    [SYS_exec] sys_exec,
++    [SYS_fstat] sys_fstat,
++    [SYS_chdir] sys_chdir,
++    [SYS_dup] sys_dup,
++    [SYS_getpid] sys_getpid,
++    [SYS_sbrk] sys_sbrk,
++    [SYS_sleep] sys_sleep,
++    [SYS_uptime] sys_uptime,
++    [SYS_open] sys_open,
++    [SYS_write] sys_write,
++    [SYS_mknod] sys_mknod,
++    [SYS_unlink] sys_unlink,
++    [SYS_link] sys_link,
++    [SYS_mkdir] sys_mkdir,
++    [SYS_close] sys_close,
++    [SYS_draw] sys_draw,
+ };
+ 
+-void
+-syscall(void)
++void syscall(void)
+ {
+   int num;
+   struct proc *curproc = myproc();
+ 
+   num = curproc->tf->eax;
+-  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
++  if (num > 0 && num < NELEM(syscalls) && syscalls[num])
++  {
+     curproc->tf->eax = syscalls[num]();
+-  } else {
++  }
++  else
++  {
+     cprintf("%d %s: unknown sys call %d\n",
+             curproc->pid, curproc->name, num);
+     curproc->tf->eax = -1;
+diff -uN xv6-public/syscall.h xv6-modified/syscall.h
+--- xv6-public/syscall.h	2021-08-20 20:42:45.015272086 +0530
++++ xv6-modified/syscall.h	2021-08-20 11:37:07.215339010 +0530
+@@ -20,3 +20,4 @@
+ #define SYS_link   19
+ #define SYS_mkdir  20
+ #define SYS_close  21
++#define SYS_draw   22
+diff -uN xv6-public/sysdraw.c xv6-modified/sysdraw.c
+--- xv6-public/sysdraw.c	1970-01-01 05:30:00.000000000 +0530
++++ xv6-modified/sysdraw.c	2021-08-20 20:18:16.769499596 +0530
+@@ -0,0 +1,46 @@
++#include "sysdraw.h"
++#include "types.h"
++#include "defs.h"
++#include "param.h"
++#include "stat.h"
++#include "mmu.h"
++#include "proc.h"
++#include "fs.h"
++#include "spinlock.h"
++#include "sleeplock.h"
++#include "file.h"
++#include "fcntl.h"
++
++// Kernel code for draw system call.
++// Uses the ASCII art defined in sysdraw.h
++int sys_draw(void)
++{
++    // System call arguments
++    char *buffer;
++    uint buffer_size;
++
++    // Fetch the second argument from stack
++    // If the argument is invalid return -1
++    if (argint(1, (int *)&buffer_size) < 0)
++    {
++        return -1;
++    }
++
++    // If buffer is of insufficient size, return -1
++    if (buffer_size < strlen(wolf))
++    {
++        return -1;
++    }
++
++    // Fetch user supplied buffer pointer (first argument) from stack
++    // If argument is invalid return -1
++    if (argptr(0, &buffer, buffer_size) < 0)
++    {
++        return -1;
++    }
++
++    // Copy ASCII art into user provided buffer
++    memmove(buffer, wolf, strlen(wolf));
++
++    return strlen(wolf);
++}
+\ No newline at end of file
+diff -uN xv6-public/sysdraw.h xv6-modified/sysdraw.h
+--- xv6-public/sysdraw.h	1970-01-01 05:30:00.000000000 +0530
++++ xv6-modified/sysdraw.h	2021-08-20 20:17:24.458101672 +0530
+@@ -0,0 +1,30 @@
++
++int sys_draw(void);
++
++static const char wolf[] = "\t\t\t\t,ood8888booo,\n\
++                              ,od8           8bo,\n\
++                           ,od                   bo,\n\
++                         ,d8                       8b,\n\
++                        ,o                           o,    ,a8b\n\
++                       ,8                             8,,od8  8\n\
++                       8'                             d8'     8b\n\
++                       8                           d8'ba     aP'\n\
++                       Y,                       o8'         aP'\n\
++                        Y8,                      YaaaP'    ba\n\
++                         Y8o                   Y8'         88\n\
++                          `Y8               ,8\"           `P\n\
++                            Y8o        ,d8P'              ba\n\
++                       ooood8888888P\"\"\"'                  P'\n\
++                    ,od                                  8\n\
++                 ,dP     o88o                           o'\n\
++                ,dP          8                          8\n\
++               ,d'   oo       8                       ,8\n\
++               $    d$\"8      8           Y    Y  o   8\n\
++              d    d  d8    od  \"\"boooooooob   d\"\" 8   8\n\
++              $    8  d   ood' ,   8        b  8   '8  b\n\
++              $   $  8  8     d  d8        `b  d    '8  b\n\
++               $  $ 8   b    Y  d8          8 ,P     '8  b\n\
++               `$$  Yb  b     8b 8b         8 8,      '8  o,\n\
++                    `Y  b      8o  $$o      d  b        b   $o\n\
++                     8   '$     8$,,$\"      $   $o      '$o$$\n\
++                      $o$$P\"                 $$o$\n\n";
+diff -uN xv6-public/user.h xv6-modified/user.h
+--- xv6-public/user.h	2021-08-20 20:42:45.015272086 +0530
++++ xv6-modified/user.h	2021-08-20 20:20:52.696976621 +0530
+@@ -5,35 +5,39 @@
+ int fork(void);
+ int exit(void) __attribute__((noreturn));
+ int wait(void);
+-int pipe(int*);
+-int write(int, const void*, int);
+-int read(int, void*, int);
++int pipe(int *);
++int write(int, const void *, int);
++int read(int, void *, int);
+ int close(int);
+ int kill(int);
+-int exec(char*, char**);
+-int open(const char*, int);
+-int mknod(const char*, short, short);
+-int unlink(const char*);
+-int fstat(int fd, struct stat*);
+-int link(const char*, const char*);
+-int mkdir(const char*);
+-int chdir(const char*);
++int exec(char *, char **);
++int open(const char *, int);
++int mknod(const char *, short, short);
++int unlink(const char *);
++int fstat(int fd, struct stat *);
++int link(const char *, const char *);
++int mkdir(const char *);
++int chdir(const char *);
+ int dup(int);
+ int getpid(void);
+-char* sbrk(int);
++char *sbrk(int);
+ int sleep(int);
+ int uptime(void);
++// User system call used to execute sys_draw
++// @void* - Pointer to the buffer to store ASCII art
++// @uint - Size of the buffer
++int draw(void *, uint);
+ 
+ // ulib.c
+-int stat(const char*, struct stat*);
+-char* strcpy(char*, const char*);
+-void *memmove(void*, const void*, int);
+-char* strchr(const char*, char c);
+-int strcmp(const char*, const char*);
+-void printf(int, const char*, ...);
+-char* gets(char*, int max);
+-uint strlen(const char*);
+-void* memset(void*, int, uint);
+-void* malloc(uint);
+-void free(void*);
+-int atoi(const char*);
++int stat(const char *, struct stat *);
++char *strcpy(char *, const char *);
++void *memmove(void *, const void *, int);
++char *strchr(const char *, char c);
++int strcmp(const char *, const char *);
++void printf(int, const char *, ...);
++char *gets(char *, int max);
++uint strlen(const char *);
++void *memset(void *, int, uint);
++void *malloc(uint);
++void free(void *);
++int atoi(const char *);
+diff -uN xv6-public/usys.S xv6-modified/usys.S
+--- xv6-public/usys.S	2021-08-20 20:42:45.015272086 +0530
++++ xv6-modified/usys.S	2021-08-20 12:20:18.348246880 +0530
+@@ -29,3 +29,4 @@
+ SYSCALL(sbrk)
+ SYSCALL(sleep)
+ SYSCALL(uptime)
++SYSCALL(draw)
